@@ -1,3 +1,294 @@
+v152
+(17/06/17)
+
+Changes / Improvements / Optimizations:
+DietPi RPi Kernel | Updated to 4.9.30
+Sparky SBC Kernel | Updated: https://github.com/Fourdee/DietPi/issues/1015
+Odroid XU4 | Image updated to include kernel support for EMMC 5.1. Many thanks to Meveric.
+DietPi-Config | Added support for Allo Mini BOSS DAC and Allo DigiOne: https://github.com/Fourdee/DietPi/issues/999
+DietPi-Software | PlexPy: Now available for installation. Many thanks to @FireHelmet for providing us with the installation scripts!: https://github.com/Fourdee/DietPi/issues/971
+DietPi-Software | Radarr: Now available for installation. Automatically downloads movies. Many thanks to @FireHelmet for providing us with the installation scripts!: https://github.com/Fourdee/DietPi/issues/966
+DietPi-Software | Sonarr: Now available for installation. Automatically downloads TV shows. Many thanks to @FireHelmet for providing us with the installation scripts!: https://github.com/Fourdee/DietPi/issues/966
+DietPi-Software | Jackett: Now available for installation. API for trackers, can be used with Sonaar/Radaar etc. Many thanks to @FireHelmet for providing us with the installation scripts!: https://github.com/Fourdee/DietPi/issues/1010
+DietPi-Software | JRiver: Now available for installation. RPi only: https://github.com/Fourdee/DietPi/issues/988
+DietPi-Software | NZBget: Now available for installation. Fast NZB download manager (c++) with web interface: https://github.com/Fourdee/DietPi/issues/1013
+DietPi-Software | apc.php: Now installs latest version from github. Many thanks to @MichaIng: https://github.com/Fourdee/DietPi/issues/475#issuecomment-305898287
+DietPi-Software | Pydio: New installs latest version. Many thanks to @noplanman: https://github.com/Fourdee/DietPi/pull/1008
+
+Bug fixes:
+DietPi-Config | MP2/WVC1 key entry: Resolved an issue where decode_XXX entries were not being generated: https://github.com/Fourdee/DietPi/issues/885#issuecomment-305731094
+DietPi-Software | Plex Media Server (x86_64) installation now functional (due to URL changes): https://github.com/Fourdee/DietPi/issues/998
+DietPi-Software | Resolved an issue where incompatible software titles, were not being disabled for x86_64.
+DietPi-Software | WiringPi: Installs will be updated to latest version. This is to ensure compatibility with 4.9 kernel on RPi: https://github.com/Fourdee/DietPi/issues/1001
+DietPi-Services | Stretch: Resolved an issue with MariaDB installations, DietPi will no longer launch both mysql and mariaDB services. Many thanks to @MichaIng for his assistance on this: https://github.com/Fourdee/DietPi/issues/1000
+DietPi-Software | Stretch: Resolved an issue with deprecated --force-yes during apt installs. Many thanks to @MichaIng for providing the solution!: https://github.com/Fourdee/DietPi/issues/1018
+
+-----------------------------------------------------------------------------------------------------------
+
+v151
+(01/06/17)
+
+Images:
+OPi Zero Plus 2 (H5): Image now available: https://github.com/Fourdee/DietPi/issues/876
+
+Changes / Improvements / Optimizations:
+RPi 3 USB Boot | Now supported with our updated v150 image. USB boot loader bit must be enabled on the device (see DietPi-Config | Advanced Options > USB Boot), prior to functional USB boot: https://github.com/Fourdee/DietPi/issues/970#issuecomment-304264851
+General | NTP wait increased to 30 seconds (from 20): https://github.com/Fourdee/DietPi/issues/954
+DietPi-Config | Advanced Options > USB Boot | Added for RPi 3 only. Enables the device to boot from USB mass storage devices: https://github.com/Fourdee/DietPi/issues/983#issue-231863978
+DietPi-Config | Display Options > LED Control: New feature. Allows you to set trigger types for all LEDs on system (eg: off/heartbeat). Automatically applied during boot: https://github.com/Fourdee/DietPi/issues/968
+DietPi-Config | Tools > Filesystem benchmarks | Added ability to use a custom location, by selecting from a list of active mounts on system. This also includes CIFS/SAMBA mounts etc.
+DietPi-Drive_Manager | Support for PARTUUID fstab entries/mounts: https://github.com/Fourdee/DietPi/issues/970
+DietPi-Software | Koel: Now available for installation. Web interface audio streamer. Many thanks to @sootstone for the install notes! https://github.com/Fourdee/DietPi/issues/797
+DietPi-Software | Remot3.it (formally Weaved): Updated to latest version (1.3-07v) to allow support for Remot3.it. Existing installations will need to uninstall/reinstall to upgrade. Available binaries now limited to ARMv6/7 (eg: RPi): https://github.com/Fourdee/DietPi/issues/978
+DietPi-Software | ReadyMedia (formally MiniDLNA): Updated all references to software names: https://github.com/Fourdee/DietPi/issues/979
+DietPi-Software | Shairport-sync: Re-compiled to include MetaData by default: https://github.com/Fourdee/DietPi/issues/962
+DietPi-Software | NextCloud: Updated to latest version (12.0.0), existing installations will need to uninstall/reinstall to update: https://github.com/Fourdee/DietPi/issues/974
+DietPi-Software | sabnzbd: Updated to latest version (2.0.1), existing installations will need to uninstall/reinstall to update: https://github.com/Fourdee/DietPi/issues/865#issuecomment-305461703
+
+Bug fixes:
+General | Resolved a critial issue with VM images, due to DietPi-Drive_Manager functions exiting, prior to providing valid exit code, rendering most DietPi scripts unavailable. Many thanks to @sosher and @powerzumsel for reporting this: https://github.com/Fourdee/DietPi/issues/960
+DietPi-Config | Disabling CPU freq limits, will now re-apply the highest clock before-hand.
+DietPi-Config | XU4 4.9: CPU freq limits for 2GHz cores now available: https://github.com/Fourdee/DietPi/issues/926
+DietPi-Drive_Manager | Resolved RootFS detection on script launch, with RPi. Due to /dev/root reported mount source, as appossed to /dev/mmcblk0p2: https://github.com/Fourdee/DietPi/issues/959
+DietPi-Software | Shairport-sync: Resolved issues with config file having no effect. Location updated to /usr/local/etc/shairport-sync.conf: https://github.com/Fourdee/DietPi/issues/962#issuecomment-301735237
+
+-----------------------------------------------------------------------------------------------------------
+
+v150
+(15/05/17)
+
+Changes / Improvements / Optimizations:
+General | Preperation for Odroid XU4 4.9 kernel support, once its released through apt: https://github.com/Fourdee/DietPi/issues/899
+General | First Run Setup: Partition resize/expansion now supports /dev/mmcblk[0-10]: https://github.com/Fourdee/DietPi/issues/899#issuecomment-298912660
+General | ASUS TB: Image has been updated, brings it up to Debian Stretch and latest kernel (as per official ASUS beta image v1.8).
+General | Stretch: Now installs Chromium via apt.
+General | DietPi RPi Kernel: Updated to 4.9: https://github.com/Fourdee/DietPi/issues/936
+General | rpi_boardinfo: Has been removed from DietPi scripts. Now contained within dietpi-obtain_hw_model: https://github.com/Fourdee/DietPi/issues/936#issuecomment-301055299
+DietPi-Autostart | Added ability to select "custom", editing script located in /etc/dietpi/autostart.sh, to launch any command during boot: https://github.com/Fourdee/DietPi/issues/916
+DietPi-Config | Display Options: Added ability to enter MPEG2/VC1 keys for RPi: https://github.com/Fourdee/DietPi/issues/885
+DietPi-Config | WiFi Hotspot: Added ability to toggle on/off state of hotspot: https://github.com/Fourdee/DietPi/issues/924
+DietPi-Drive_Manager | Added support for setting Read Only/Read Write filesystems: https://github.com/Fourdee/DietPi/issues/229
+DietPi-Process_Tool | Added support for PiHole FTL.
+DietPi-RAMdisk | Log files now include timestamps. Thanks @WolfganP: https://github.com/Fourdee/DietPi/issues/905#issuecomment-298241622
+DietPi-RAMlog | Mode 2: PiHole logs now included in hourly backups: https://github.com/Fourdee/DietPi/issues/933
+DietPi-Software | CouchPotato: Now available for installation: http://dietpi.com/phpbb/viewtopic.php?f=8&t=5&p=7212#p7212
+DietPi-Software | Python-Pip: Also installs python-dev by default. Required for compiling.
+DietPi-Software | WiringPi: Now available for BPi Pro: https://github.com/Fourdee/DietPi/issues/937
+DietPi-Software | Blynk Server: Updated to latest version (0.24) for new installations only. Thanks @phonicmouse: https://github.com/Fourdee/DietPi/pull/912
+DietPi-Software | UrBackupSrv: Updated to latest version (2.1.19) for new installations only. Thanks @mtdjr : https://github.com/Fourdee/DietPi/issues/948
+
+Bug fixes:
+General | RPi: HW_MODEL_INDEX detection has changed. Now uses revision codes pulled from /proc/cpuinfo. This is mainly to support 4.9 kernel which lacks correct BCM code we previously used: https://github.com/Fourdee/DietPi/issues/936
+General | If NTPD has not been run, it will be launched automatically, before waiting for status completion: https://github.com/Fourdee/DietPi/issues/919
+General | Resolved an issue with incorrect temp readouts on H3/H2+ and NanoPi M2/M3 boards. Many thanks to @hectorcamp for the report: https://github.com/Fourdee/DietPi/issues/909
+General | RPi kernel is now overwritten without cleanup, to prevent failed unzip (0bytes free space) rendering system unbootable: https://github.com/Fourdee/DietPi/issues/905
+General | NanoPi M3: CIFS now built into our kernel: https://github.com/Fourdee/DietPi/issues/920
+DietPi-Config | Sound Card: Correct name for Audiophonics I-Sabre 9028, as this driver is only compatible with that device.
+DietPi-Drive_Manager | Resolved an issue where changing formatting options, prior to RootFS transfer, would prevent RootFS transfer completing: https://github.com/Fourdee/DietPi/issues/926#issuecomment-301256888
+DietPi-RAMdisk | Disabled clearing of DietPi files, prior to disk save, in attempt to prevent loss of DietPi files in /boot, in 0byte free space situations: https://github.com/Fourdee/DietPi/issues/905#issuecomment-298241622
+DietPi-RAMLog | Tweaked log clearing for PiHole FTL logs: https://github.com/Fourdee/DietPi/issues/918#issuecomment-299173649
+DietPi-Software | At least 500MB of free space is now required on RootFS, before software will be installed: https://github.com/Fourdee/DietPi/issues/905#issuecomment-298343932
+DietPi-Software | Resolved an issue where unauthenticated packages (eg: from other repos), would prevent apt-get upgrade from completing, due to lack of --force-yes.
+DietPi-Software | Resolved an issue with SubSonic installation failing, due to package conflicts with lame and libmp3lame (from our ffmpeg): https://github.com/Fourdee/DietPi/issues/946
+DietPi-Update | At least 500MB of free space is now required on RootFS, before DietPi can be updated: https://github.com/Fourdee/DietPi/issues/905#issuecomment-298343932
+
+-----------------------------------------------------------------------------------------------------------
+
+v149
+(28/04/17)
+
+New Device / Images:
+OrangePi Zero Plus 2 (H3) | https://github.com/Fourdee/DietPi/issues/876#issuecomment-294464779
+OrangePi Win | https://github.com/Fourdee/DietPi/issues/875#issuecomment-296160956
+OrangePi Prime | https://github.com/Fourdee/DietPi/issues/874#issuecomment-297675707
+
+Changes / Improvements / Optimizations:
+DietPi-Config | Display Rotation: New options for RPi HDMI output and Touchscreen devices. DietPi also calculates FB X/Y flip automatically, if required to utilize full screen under 90/270 rotations. Many thanks to @midwan for RPi touch screen testing: https://github.com/Fourdee/DietPi/issues/859
+DietPi-Config | Hostname change: Now prompts for immediate reboot. This is to avoid potential issues with software installations and non-updated hostname on system. Many thanks to @9H5G for the suggestion: https://github.com/Fourdee/DietPi/issues/880
+DietPi-Config | Audio > Sound Card: Updated hifiberry-dac to include HiFiBerry MiniAMP, many thanks to ta11 for the info: https://twitter.com/ta11/status/852599202186227712
+DietPi-Config | Swapfile: Added ability to select Auto size (1GB - total RAM = size). Auto is now the default. Mainly to prevent out of memory errors on recent influx of 256MB boards.
+DietPi-Obtain_Hw_Model | Optimized/reduced count of total HW_ARCH (from 21 to 10). Will improve performance in DietPi-Software due to reduced array size.
+DietPi-RAMlog | PiHole: PiHole FTL log file is now excluded from 1 hour clear (preserves current day logs): https://github.com/Fourdee/DietPi/issues/868
+DietPi-Software | Amiberry SDL2: Now available for installation. SDL2 Amiberry is currently in dev/testing. can be enabled with dietpi-autostart and selecting SDL2 option. Roughly 2x FPS increase over SDL1: https://github.com/Fourdee/DietPi/issues/850
+DietPi-Software | VirtualHere: Now available for installation. Allows you to access psychically attached USB devices, over the network: http://dietpi.com/phpbb/viewtopic.php?f=8&t=5&p=6709#p6709
+DietPi-Software | SABnzbd: Now available for installation. NZB download manager with web interface: http://dietpi.com/phpbb/viewtopic.php?f=8&t=5&p=6747#p6747
+DietPi-Software | Spotify Connect Web: Now available for installation. Web interface, client and player for Spotify Premium: http://dietpi.com/phpbb/viewtopic.php?f=8&t=5&p=7013#p7013
+DietPi-Software | SDL2: Now available for installation in additional linux software (RPi only).
+DietPi-Software | FFmpeg: (RPi devices) now installs our binaries built with OpenMAX HW encoding enabled: https://github.com/Fourdee/DietPi/issues/869
+DietPi-Software | AmiBerry: Renamed all references of uae4arm to AmiBerry: https://github.com/Fourdee/DietPi/issues/850
+DietPi-Software | NAA Daemon: Updated to latest version (3.5.1-35). Many thanks to volpone for the heads up: http://dietpi.com/phpbb/viewtopic.php?f=11&t=1832
+General | DietPi RPi Kernel: Now supports 384KHz audio output. Tested with Allo BOSS DAC and JustBoom-DAC: https://github.com/Fourdee/DietPi/issues/900#issuecomment-297775790
+General | ARMbian built images: Console boot verbosity increase.
+General | DietPi user: Now created for testing "dietpi". We are aiming to phase out root with our DietPi user in the future, currently, this account is for testing/debugging only. Default password is "dietpi" if "AUTO_Global_Password=" is unchanged in dietpi.txt: https://github.com/Fourdee/DietPi/issues/796
+General | RPi Jessie: Image updated to latest
+General | AmiBerry: Image updated to latest
+
+Bug fixes:
+DietPi-Process_Tool | Emby server: Now supported.
+DietPi-CPU_Info | Now supports devices used in a freezer (- values) :D. Thanks to Gordon for reporting and testing this: http://dietpi.com/phpbb/viewtopic.php?f=11&t=1677&p=6800#p6790
+DietPi-Software | Amiberry SDL1: NUM/CAPS LEDs are now fully functional: https://github.com/Fourdee/DietPi/issues/760#issuecomment-288496760
+
+-----------------------------------------------------------------------------------------------------------
+
+v148
+(08/04/17)
+
+Changes / Improvements / Optimizations:
+DietPi-Config | WiFi: Country code is now also applied to cfg80211 module params (ieee80211_regdom=): https://github.com/Fourdee/DietPi/issues/838
+DietPi-Config | Network NAS/Misc: Added option to delay boot, until a valid network connection is established: https://github.com/Fourdee/DietPi/issues/842
+DietPi-Config | Audio > Sound Card: Added support for AudioPhonics I-Sabre-K2M (9018K2M): https://github.com/Fourdee/DietPi/issues/716
+DietPi-Software | NTPD check/wait: Is now bypassed if no valid network connection is available. It will be checked again, before software installation: https://github.com/Fourdee/DietPi/issues/840
+DietPi-Software | Tonido: Now available for installation. Lightweight alternative to NextCloud/Owncloud: http://dietpi.com/phpbb/viewtopic.php?f=8&t=5&p=6476#p6476
+DietPi-Software | IceCast: Now available for installation. This is a Shoutcast streaming server, using DarkIce for audio input: http://dietpi.com/phpbb/viewtopic.php?f=8&t=5&p=6526#p6526
+DietPi-Software | MotionEye: Now available for installation (RPi only). Web interface and surveillance for your RPi/USB camera. Mainly focused towards motion detection usage: http://dietpi.com/phpbb/viewtopic.php?f=8&t=5&start=100
+DietPi-Software | CloudPrint (Google): Now available for installation. Print server with support for Google cloud printing. Many thanks to Sciamano for his assistance with testing: http://dietpi.com/phpbb/viewtopic.php?f=8&t=5&start=100#p6630
+DietPi-Set_Hardware | RPi Camera: Now enables bcm2835-v4l2 by default. Required for /dev/video0 stream (mainly for motioneye).
+General | Boot: All failed drive mounts will be re-mounted after network connection is established. This is mainly a failsafe for CIFS/net shares, to ensure they are mounted again after network established: https://github.com/Fourdee/DietPi/issues/842#issuecomment-289448261
+
+Bug fixes:
+DietPi-Software | YaCy: Web interface admin details are now set during install. Username = admin, password = dietpi. Many thanks to Pilovali for reporting this!:
+DietPi-Software | Gogs: Installation now resolved. Due to https://dl.gogs.io/ removing "latest" links for binary download. Now hosted on dietpi.com: https://github.com/Fourdee/DietPi/issues/833
+DietPi-Software | OMV: Has been disabled. We have recieved too many reports from users with issues, due to incompatibility with DietPi. As we cant control what OMV does and how it does it, we cannot support it: https://github.com/Fourdee/DietPi/issues/851
+DietPi-RAMlog | PiHole: Resolved an issue where PiHole logs were being cleared every 1 hour, if default locale on system is not en_GB. PiHole logs allow for current day and 5MB size limit. Many thanks to @k-plan for his assistance with this one: https://github.com/Fourdee/DietPi/issues/839
+General | Cron-Daily: Removed a df export left over from auto TRIM code (no longer used).
+General | RoseapplePi CPU temp: Now functional. Many thanks to @joaofl for this fix: https://github.com/Fourdee/DietPi/issues/848
+
+RPi Stretch:
+DietPi-Software | FFmpeg now sucessfully installs: https://github.com/Fourdee/DietPi/issues/475
+
+-----------------------------------------------------------------------------------------------------------
+
+v147
+(24/03/17)
+
+New Image:
+Asus Tinker Board | http://dietpi.com/phpbb/viewtopic.php?f=8&t=1539#p6305
+
+Changes / Improvements / Optimizations:
+DietPi-AutoStart | Added option to launch Chromium, without a desktop: https://github.com/Fourdee/DietPi/issues/835
+DietPi-Config | Audio > Sound Card: Added support for Soekris DAM1021 DAC: https://github.com/Fourdee/DietPi/issues/808
+DietPi-Process_Tool | Blynk Server: now supported.
+DietPi-Software | Aria2: Download manager with slick web UI interface, now available for install: http://dietpi.com/phpbb/viewtopic.php?f=8&t=5&p=6177#p6177
+DietPi-Software | YaCy: Decentralized open source search engine, now available for install: http://dietpi.com/phpbb/viewtopic.php?f=8&t=5&p=6202#p6202
+DietPi-Software | Blynk Server: config file added to the diepi user data folder, thanks to @joaofl: https://github.com/Fourdee/DietPi/pull/810
+DietPi-Software | ShairPort-Sync: Updated to 3.0.2. SOXR interpolation is now enabled by default (will improve sound quality): https://github.com/Fourdee/DietPi/issues/819
+DietPi-Software | MPD: Updated to 19.21. Also includes optional plugin support for UPNP playback, can be enabled in /etc/mpd.conf (https://github.com/Fourdee/DietPi/issues/821#issuecomment-288057932): https://github.com/Fourdee/DietPi/issues/821
+DietPi-Software | NetData: Updated to 1.6. Also available for Virtual Machines (AMD64/x86_64)!: https://github.com/Fourdee/DietPi/issues/832
+
+Bug fixes:
+DietPi-Config | Change Locale: Once changed, the active locale on system will now be pumped into /etc/environment (thanks John for this), this should prevent 0.UTF-8 issues some of our users are reporting: https://github.com/Fourdee/DietPi/issues/825
+DietPi-Software | Removed references for dietpi-uninstall. Many thanks to Pilovali!
+
+-----------------------------------------------------------------------------------------------------------
+
+v146
+(14/03/17)
+
+New Device:
+RPi Zero W | Now fully supported (including onboard WiFi/BT): https://github.com/Fourdee/DietPi/issues/787
+
+Changes / Improvements / Optimizations:
+General | Wlan: 'disable power save' on boot, is now a service, installed when WiFi is enabled in 'dietpi-config' or via 'dietpi-set_hardware'.
+General | DietPi RPi Kernel: Updated to latest.
+DietPi-Drive_Manager | Added support for F2FS filesystem: https://github.com/Fourdee/DietPi/issues/802
+DietPi-Drive_Manager | Transfer RootFS now allows for selection of filesystem types on target partition (eg: f2fs), RPi only: https://github.com/Fourdee/DietPi/issues/802
+DietPi-Software | If NTPD is used (default on DietPi) for time sync, and, NTPD fails to sync, DietPi-Software will now exit, to prevent further issues with incorrect time during software installations: https://github.com/Fourdee/DietPi/issues/786
+DietPi-Software | Syncthing-inotify: Installation updated to 0.8.5 (thanks John!)
+
+Bug fixes:
+General | RPi: Resolved an issue with sudo not having setuid bit set. Many thanks to @WolfganP for the fix: https://github.com/Fourdee/DietPi/issues/794
+General | NanoPi M3: USB DACs are now functional with our latest kernel update: https://github.com/Fourdee/DietPi/issues/763
+DietPi-Software | PiHole: Resolved issues with enable/disable adblocking and DHCP server having no effect: https://github.com/Fourdee/DietPi/issues/775
+DietPi-Software | Gogs: Resolved issues with URL failing connection test due to them being renamed: https://github.com/Fourdee/DietPi/issues/793
+
+-----------------------------------------------------------------------------------------------------------
+
+v145
+(04/03/17)
+
+Changes / Improvements / Optimizations:
+DietPi-Automation | Automatic format of USB drive: This feature has now been disabled and is no longer supported. This is due to the vast changes with how DietPi handles external drives: https://github.com/Fourdee/DietPi/issues/751#issuecomment-281163299
+DietPi-Backup | Backup location: now has a list option, which allows user to select from all active mounts on system: https://github.com/Fourdee/DietPi/issues/751#issuecomment-281689544
+DietPi-Cloudshell | Storage locations: now has a list option, which allows user to select from all active mounts on system.
+DietPi-Drive_Manager | Is now capable of supporting various partitions on a drive, and, detects all drives on system.  Default mount type is now UUID. Now also capable of supporting EMMC+SD combo on Odroid C2. RootFS transfer is now unlimited and can be used multiple times (RPi/Odroid only) : https://github.com/Fourdee/DietPi/issues/751
+DietPi-Software | User data location: now has a list option, which allows user to select from all active mounts on system: https://github.com/Fourdee/DietPi/issues/751#issuecomment-281689544
+DietPi-Software | Installing both MySQL and MariaDB at the same time, is no longer possible. This it to prevent incompatible MySQL + MariaDB installation: https://github.com/Fourdee/DietPi/issues/761
+DietPi-Software | 1st run questions have been removed. Dedicated USB drives can be setup in the 'user data' option in menu: https://github.com/Fourdee/DietPi/issues/751#issuecomment-281163299
+DietPi-Software | NextCloud: Will always install the latest sub version of v11 (eg: 11.0.1): https://github.com/Fourdee/DietPi/issues/779
+DietPi-Software | HAProxy: Now installs latest version 1.7.2. Thanks to Jerome.
+DietPi-Software | Python-Pip: Now available for install via Linux software menu: https://github.com/Fourdee/DietPi/issues/784
+DietPi-Software | Blynk Server: Now available for installation: http://dietpi.com/phpbb/viewtopic.php?f=8&t=5&p=5901#p5901
+DietPi-Software | Apt errors: Are now logged to '/var/log/dietpi-software_apt.log', and, displayed during notify: https://github.com/Fourdee/DietPi/issues/791
+DietPi-Sync | Sync location: now has a list option, which allows user to select from all active mounts on system: https://github.com/Fourdee/DietPi/issues/751#issuecomment-281689544
+General | Odroids: Changed from http://oph.mdrjr.net/meveric to our new mirror http://fuzon.co.uk/meveric for Meverics repo.
+General | WiFi Power management is now disabled during boot using 'iwconfig'. This is in addition to existing power options set in /etc/network/interfaces, which have no effect wlan devices such as ap6212 (Neo Air). In other words, WiFi should provide a more stable and consistent connection on those devices.
+
+Bug fixes:
+General | ARMbian resizefs service. As this does not get removed by ARMbians initial setup scripts, we will remove it.
+General | All DEV 4.9 kernel images have been reverted back to STABLE 3.x. Recent 4.10 DEV updates from ARMbian are too unstable for acceptable usage of device: https://github.com/Fourdee/DietPi/issues/778#issuecomment-283112473
+General | ARMbian 'log2ram' has been removed on ARMbian built images, as this will conflict with DietPi-RAMlog: https://github.com/Fourdee/DietPi/issues/781
+DietPi-Software | Resolved an issue with OpenBazaar installation, due to python-pip error, resulting in a failure to run OB binary: https://github.com/Fourdee/DietPi/issues/784
+DietPi-Software | Resolved an issue where internet connection test would fail, due to 404 recieved from http://ftp.debian.org/debian. Many thanks to @tohjg for the fix: https://github.com/Fourdee/DietPi/issues/755#issuecomment-282203823
+DietPi-Software | Resolved an issue with NAA Daemon failing to install, due to URL links being dropped for stretch packages in Debian repo, again. These binaries are now permanently hosted on DietPi.com: https://github.com/Fourdee/DietPi/issues/754
+DietPi-Config | Sound card: Allo Cheapo, now sets the correct device index when running under optical out mode. Many thanks to Sudeep for the fix:
+DietPi-Config | Resolved an issue with WaveShare32 on RPi failing to run X: https://github.com/Fourdee/DietPi/issues/767
+
+RPi Stretch:
+DietPi-Drive_Manager | No longer hangs when launched: https://github.com/Fourdee/DietPi/issues/751#issuecomment-280850954
+
+-----------------------------------------------------------------------------------------------------------
+
+v144
+(16/02/17)
+
+Changes / Improvements / Optimizations:
+DietPi-Config | Audio > Sound card: Added support for Allo Boss DAC: https://github.com/Fourdee/DietPi/issues/748
+DietPi-Config | Audio > PSU Noise Reduction: This mode attempts to reduce power consumption on your SBC. In turn, this may reduce PSU inflicted noise, that may degrade audio output quality. When enabled, the following is set CPU gov = Powersave, HDMI output = Disabled: https://github.com/Fourdee/DietPi/issues/757
+DietPi-Software | AmiBerry (uae4arm): Updated to latest version (2.1): https://github.com/Fourdee/DietPi/issues/756
+DietPi-Software | DietPiCam: Updated to latest version (6.2.29). To update existing installations, this requires a reinstall: https://github.com/Fourdee/DietPi/issues/737
+DietPi-Software | Roon Bridge updated to v1.3. Now includes support for ARM64 devices (eg: Odroid C2/Pine A64): https://github.com/Fourdee/DietPi/issues/749
+DietPi-Services | Added ability to read user created include file. Allowing users to add additional services for DietPi to control: https://github.com/Fourdee/DietPi/issues/740
+
+Bug fixes:
+DietPi RPi Kernel | Resolved an issue with missing firmware for common and onboard RPi devices (eg: rpi 3 wifi): https://github.com/Fourdee/DietPi/issues/741
+SparkySBC | Kernel upgrade from Allo to improve USB DAC support.
+DietPi-Config | Resolved an issue where Samba mounts would not always mount during boot. Many thanks to @Sciamano for this fix!: https://github.com/Fourdee/DietPi/issues/744
+DietPi-Software | Resolved an issue with NoMachine armv7 binary incorrect url. Many thanks to @Qnx: https://github.com/Fourdee/DietPi/issues/750
+DietPi-Software | Resolved an issue with NAA Daemon failing to install, due to URL links being dropped for stretch packages in Debian repo. Many thanks to Rene for spotting this: https://github.com/Fourdee/DietPi/issues/754
+DietPi-Software | Resolved an issue where internet connection test would fail, when using apt sources with ftp://. Many thanks to @elRadix for reporting this: https://github.com/Fourdee/DietPi/issues/755
+
+-----------------------------------------------------------------------------------------------------------
+
+v143
+(29/01/17)
+
+Images:
+BPi Pro | Image has been updated to 4.9 kernel. Onboard WiFi is now functional, HDMI audio is not supported at this time (3.5mm only): https://github.com/Fourdee/DietPi/issues/732
+
+Changes / Improvements / Optimizations:
+General | RPi: DietPi kernel is now installed by default. This adds support for Allo Piano 2.1 DAC, and 192KHz 16bit HDMI output.
+DietPi-RAMdisk | Enabled additional logging for this process, as some users are experiencing issues. This should help us find the cause: https://github.com/Fourdee/DietPi/issues/719
+DietPi-Config | Audio > Sound card: Added support for RPi "Pi-DIGI+"
+DietPi-Software | NeoVim: Now available for RPi Stretch: https://github.com/Fourdee/DietPi/issues/692
+DietPi-Software | O!MPD: Now available for installation. Slick, feature-rich MPD web interface music player: http://dietpi.com/phpbb/viewtopic.php?f=8&t=5&p=5171#p5171
+DietPi-Software | NetData: Updated to latest (1.5.0): https://github.com/Fourdee/DietPi/issues/728
+DietPi-JustBoom | Added option to launch Alsamixer
+DietPi-JustBoom | Added various options unique to the Allo Piano 2.1 DAC: https://github.com/Fourdee/DietPi/issues/714
+
+Bug fixes:
+General | Pine 64 FB cursor is now visible: https://github.com/Fourdee/DietPi/issues/596
+General | LED heartbeat for H3 is now functional and applied during boot.
+DietPi-Config | Display > Added support for JustBoom IR Remote. Supports Kodi & MPD controls by default: https://github.com/Fourdee/DietPi/issues/735
+DietPi-Config | Audio > USB-DAC: When enabled, will always re-detect and apply active card index during boot. Many thanks to "J. Künz" for these fixes!
+DietPi-Config | Audio > Sound card: Corrected options for BPi Pro. Many thanks to "J. Künz" for these fixes!
+DietPi-Config | Audio > Sound card: Corrected options for OPi Zero (H2+) HDMI and 3.5mm analogue (default).
+DietPi-Config | Audio > Sound card: Allo Piano 2.1 DAC for RPi is now functional. Driver provided by DietPi kernel: https://github.com/Fourdee/DietPi/issues/727
+DietPi-Software | Failure to move MySQL DB store will now prevent further action being taken: https://github.com/Fourdee/DietPi/issues/715
+DietPi-Software | Resolved an issue with VNC4server/RealVNC install, that prevented desktop launch command being inserted to xstartup, if a desktop was installed beforehand:
+DietPi-Software | Resolved an issue where installing LMS and SqueezeLite at the same time, would result in apt failure 100: https://github.com/Fourdee/DietPi/issues/736
+
+-----------------------------------------------------------------------------------------------------------
+
 v142
 (14/01/17)
 

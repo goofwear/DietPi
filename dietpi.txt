@@ -4,7 +4,7 @@
 #------------------------------------------------------------------------------------------------------
 # D I E T - P I
 # 1st run settings
-# All settings below will be applied on 1st boot/run.
+# All settings below will be applied on the 1st boot of DietPi, ONCE.
 #------------------------------------------------------------------------------------------------------
 # >> Networking Options -----------------------------
 #If both Ethernet and Wifi are enabled, Wifi will take priority and Ethernet will be disabled.
@@ -33,8 +33,8 @@ Ethernet_Force_Speed=0
 
 # >> Misc Options -----------------------------------
 #Size of dphys-swapfile to generate (MB)
-#   0=Disabled.
-Swapfile_Size=100
+#   0=Disabled | 1=auto (1GB-RAM = size) | 2+=manual
+Swapfile_Size=1
 
 # >> Automation Options -----------------------------
 #NB: Following options are only executed on 1st run of DietPi.
@@ -86,16 +86,6 @@ AUTO_DietpiSoftware_LoggingIndex=-1
 #	-2=Lighttpd
 AUTO_DietpiSoftware_WebserverIndex=-2
 
-#Dedicated USB drive automation
-#	To use this feature, create a blank file: /boot/Automation_Format_My_Usb_Drive
-#	If the file exists, the USB drive will be formatted to ext4. (WARNING: ALL DATA ON /dev/sda WILL BE DELETED. YOU HAVE BEEN WARNED!).
-#   DietPi will configure your software installations to use your dedicated drive for personal data. (eg: owncloud data / bittorrent downloads etc)
-#   NB: Plug in 1 USB drive before powering on system. Use 1 USB drive ONLY.
-#eg: touch /boot/Automation_Format_My_Usb_Drive
-
-#	Format filesystem type | 0=ext4 1=ntfs 2=fat32 3=hfs+ 4=btrfs | requires /boot/Automation_Format_My_Usb_Drive
-AUTO_Dedicated_Usb_Drive_Format_Filesystem=0
-
 #DietPi-Autostart | Requires AUTO_Install_Enable=1
 #   After installation is completed, which program should the system boot to?
 #   0=Console 7=Console+auto root login | 1=Kodi 2=Desktops (LXDE/MATE etc) 5=DietPi-Cloudshell 6=Uae4ARM (Fastboot) 8=Uae4ARM (standard boot) 9=dxx-rebirth
@@ -126,8 +116,8 @@ rpi_hdmi_output=1
 cpu_governor=interactive
 cpu_usage_throttle_up=50
 
-#Limit the max cpu frequency (Mhz) for all cores. | 0=disabled | Useful for lowering temp/power usage on your device.
-cpu_max_frequency=0
+#Limit the max cpu frequency (Mhz) for all cores. | Disabled=disabled | Useful for lowering temp/power usage on your device.
+cpu_max_frequency=Disabled
 
 #Min value 10000 microseconds (10ms)
 cpu_ondemand_sampling_rate=25000
@@ -155,6 +145,9 @@ proxy_address=MyProxyServer.com
 proxy_port=8080
 proxy_username=
 proxy_password=
+
+#Delay boot until network is established: 0=disabled | 1=10 second wait max (default) | 2=infinite wait
+boot_wait_for_network=1
 
 #DietPi check for updates (allows dietpi to check for updates on a daily basis and boot using a <1kb file download.)
 dietpi_check_for_updates=1
@@ -187,19 +180,12 @@ prefer_ipversion=auto
 #	Raspbian = https://www.raspbian.org/RaspbianMirrors
 #	Debian = https://www.debian.org/mirror/official#list
 Apt_Raspbian_Mirror=http://mirror.ox.ac.uk/sites/archive.raspbian.org/archive/raspbian
-Apt_Debian_Mirror=http://ftp.debian.org/debian
+Apt_Debian_Mirror=http://ftp.debian.org/debian/
 
 #------------------------------------------------------------------------------------------------------
 # D I E T - P I
 # DietPi-Software settings.
 #------------------------------------------------------------------------------------------------------
-#Override target directory for user/personal data.
-#This is applied to software configurations when installing software (eg: owncloud, bittorrent downloads etc).
-#  Auto = Automatic (default). If USB dedicated drive was setup /mnt/usb_1, else, /mnt/dietpi_userdata
-#  /mnt/Where/I/Want/My/Data = Example
-#  /mnt/user_data = Example
-dietpi_userdata_basedirectory=Auto
-
 #Enter your EmonCMS.org write API key here. It will be applied automatically during EmonPi/Hub installation.
 # - eg: dietpi_emonhub_apikey=b4dfmk2o203mmxx93a
 dietpi_emonhub_apikey=
@@ -220,3 +206,6 @@ dietpi_nextcloud_username=admin
 #------------------------------------------------------------------------------------------------------
 gitbranch=master
 gitforkowner=Fourdee
+
+# - Max size of rootfs resize (%)
+rootfs_resize_limit=100

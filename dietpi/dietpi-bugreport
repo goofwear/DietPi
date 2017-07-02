@@ -15,6 +15,9 @@
 
 	#Force en_GB Locale for whole script. Prevents incorrect parsing with non-english locales.
 	LANG=en_GB.UTF-8
+	
+	#Ensure we are in users home dir: https://github.com/Fourdee/DietPi/issues/905#issuecomment-298223705
+	cd "$HOME"
 
 	# - byte
 	UPLOAD_FILESIZE_LIMIT=52428800
@@ -117,9 +120,10 @@ _EOF_
 			# - logs
 			"/var/log/*"
 
-			# - DietPi scripts
+			# - DietPi scripts / logs
 			"/DietPi/*"
 			"/boot/*"
+			"/etc/dietpi/logs/*"
 
 			# - confs
 			"/etc/X11/xorg.conf"
@@ -156,6 +160,7 @@ _EOF_
 			"ls -lha /var/log"
 			"dpkg -l"
 			"ifconfig -a"
+			"iwconfig"
 			"ip a"
 			"lsusb"
 			"cat /proc/cpuinfo"
@@ -167,6 +172,8 @@ _EOF_
 			"cut -d: -f1 /etc/passwd"
 			"locale"
 			"ls -lha /mnt" #dietpi userdata location
+			"dmesg"
+			"lsmod"
 
 		)
 

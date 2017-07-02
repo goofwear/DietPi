@@ -11,9 +11,10 @@
 	#
 	# Usage:
 
+	# - /DietPi/dietpi/func/dietpi-set_hardware 		rpi3_usb_boot	enable
 	# - /DietPi/dietpi/func/dietpi-set_hardware 		rpi-camera		enable/disable
 	# - /DietPi/dietpi/func/dietpi-set_hardware 		gpumemsplit		64/128/256 #RPi only
-	# - /DietPi/dietpi/func/dietpi-set_hardware 		remoteir		odroid_remote
+	# - /DietPi/dietpi/func/dietpi-set_hardware 		remoteir		odroid_remote/justboom_ir_remote
 	# - /DietPi/dietpi/func/dietpi-set_hardware 		kernel			??see sourcode
 	# - /DietPi/dietpi/func/dietpi-set_hardware 		eth-forcespeed	10/100/1000/disable
 	# - /DietPi/dietpi/func/dietpi-set_hardware 		rpi-opengl		enable/disable
@@ -29,6 +30,33 @@
 
 	#Force en_GB Locale for whole script. Prevents incorrect parsing with non-english locales.
 	LANG=en_GB.UTF-8
+
+	#Ensure we are in users home dir: https://github.com/Fourdee/DietPi/issues/905#issuecomment-298223705
+	cd "$HOME"
+
+	#Exit path for non-root logins.
+	if (( $UID != 0 )); then
+
+		/DietPi/dietpi/func/dietpi-notify 1 'Error: Root privileges required. Please run the command with "sudo"\n'
+		exit
+
+	fi
+
+	#RootFS RW check
+	/DietPi/dietpi/dietpi-drive_manager 3
+	if (( $? != 0 )); then
+
+		exit
+
+	fi
+
+	#Semi support non-dietpi Raspbian
+	FP_RPI_CONFIG='/DietPi/config.txt'
+	if [ ! -f "$FP_RPI_CONFIG" ]; then
+
+		FP_RPI_CONFIG='/boot/config.txt'
+
+	fi
 
 	INPUT_DEVICE_NAME=$(echo -e "$1" | tr '[:upper:]' '[:lower:]')
 	INPUT_DEVICE_VALUE=$(echo -e "$2" | tr '[:upper:]' '[:lower:]')
@@ -47,8 +75,10 @@
 	EXIT_CODE=0
 
 	HW_MODEL=$(sed -n 1p /DietPi/dietpi/.hw_model)
+	HW_ARCH=$(sed -n 6p /DietPi/dietpi/.hw_model)
 	DISTRO=$(sed -n 3p /DietPi/dietpi/.hw_model)
 	HW_CPUID=$(sed -n 9p /DietPi/dietpi/.hw_model)
+	HW_ONBOARD_WIFI=$(sed -n 10p /DietPi/dietpi/.hw_model)
 
 	Unknown_Input_Name(){
 
@@ -73,18 +103,68 @@
 		if [ "$INPUT_DEVICE_VALUE" = "enable" ]; then
 
 			# - Enable RPi Camera module
-			sed -i '/start_x=/c\start_x=1' /DietPi/config.txt
+			sed -i '/start_x=/c\start_x=1' "$FP_RPI_CONFIG"
 
 			# - requires 128MB memory split min.
-			if (( $(cat /DietPi/config.txt | grep -m1 'gpu_mem_' | sed 's/.*=//g') < 128 )); then
+			if (( $(cat "$FP_RPI_CONFIG" | grep -m1 'gpu_mem_' | sed 's/.*=//g') < 128 )); then
 
 				/DietPi/dietpi/func/dietpi-set_hardware gpumemsplit 128
 
 			fi
 
+			# - v4l2 module (motioneye /dev/video0)
+			if (( ! $(cat /etc/modules | grep -ci -m1 '^bcm2835-v4l2') )); then
+
+				echo -e "bcm2835-v4l2" >> /etc/modules
+
+			fi
+
 		elif [ "$INPUT_DEVICE_VALUE" = "disable" ]; then
 
-			sed -i '/start_x=/c\start_x=0' /DietPi/config.txt
+			sed -i '/start_x=/c\start_x=0' "$FP_RPI_CONFIG"
+			sed -i '/bcm2835-v4l2/d' /etc/modules
+
+		else
+
+			Unknown_Input_Mode
+
+		fi
+
+	}
+
+	#/////////////////////////////////////////////////////////////////////////////////////
+	#rpi3_usb_boot
+	#/////////////////////////////////////////////////////////////////////////////////////
+	RPi_USB_Boot_Main(){
+
+		if [ "$INPUT_DEVICE_VALUE" = "enable" ]; then
+
+			sed -i '/program_usb_boot_mode=/d' "$FP_RPI_CONFIG"
+			cat << _EOF_ >> "$FP_RPI_CONFIG"
+program_usb_boot_mode=1
+_EOF_
+
+			cat << _EOF_ > /etc/systemd/system/dietpi-rm_program_usb_boot_mode.service
+[Unit]
+Description=dietpi-rm_program_usb_boot_mode.service
+After=dietpi-boot.service
+
+[Service]
+Type=simple
+RemainAfterExit=yes
+ExecStartPre=$(which sed) -i '/program_usb_boot_mode=/d' $FP_RPI_CONFIG
+ExecStartPre=$(which systemctl) disable dietpi-rm_program_usb_boot_mode.service
+ExecStart=$(which systemctl) daemon-reload
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+systemctl daemon-reload
+systemctl enable dietpi-rm_program_usb_boot_mode.service
+
+		elif [ "$INPUT_DEVICE_VALUE" = "disable" ]; then
+
+			sed -i '/program_usb_boot_mode=/d' "$FP_RPI_CONFIG"
 
 		else
 
@@ -102,9 +182,9 @@
 		# - int, assume RPi
 		if [[ $INPUT_DEVICE_VALUE =~ ^-?[0-9]+$ ]]; then
 
-			sed -i "/gpu_mem_256=/c\gpu_mem_256=$INPUT_DEVICE_VALUE" /DietPi/config.txt
-			sed -i "/gpu_mem_512=/c\gpu_mem_512=$INPUT_DEVICE_VALUE" /DietPi/config.txt
-			sed -i "/gpu_mem_1024=/c\gpu_mem_1024=$INPUT_DEVICE_VALUE" /DietPi/config.txt
+			sed -i "/gpu_mem_256=/c\gpu_mem_256=$INPUT_DEVICE_VALUE" "$FP_RPI_CONFIG"
+			sed -i "/gpu_mem_512=/c\gpu_mem_512=$INPUT_DEVICE_VALUE" "$FP_RPI_CONFIG"
+			sed -i "/gpu_mem_1024=/c\gpu_mem_1024=$INPUT_DEVICE_VALUE" "$FP_RPI_CONFIG"
 
 		else
 
@@ -117,23 +197,46 @@
 	#/////////////////////////////////////////////////////////////////////////////////////
 	#remoteir
 	#/////////////////////////////////////////////////////////////////////////////////////
+	RemoteIR_Prereqs(){
+
+		# - LIRC
+		if (( ! $(dpkg --get-selections | grep -ci -m1 '^lirc') )); then
+
+			apt-get install -y lirc
+			if (( $? != 0 )); then
+
+				/DietPi/dietpi/func/dietpi-notify 1 "apt-get install lirc"
+				EXIT_CODE=1
+
+			fi
+
+		fi
+
+	}
+
+	RemoteIR_Reset_All(){
+
+		# - Disable odroids
+		systemctl stop odroid-remote
+		systemctl disable odroid-remote
+		rm /etc/systemd/system/odroid-remote.service
+
+		# - Disable JustBoom
+		systemctl stop justboom-ir-mpd.service
+		systemctl disable justboom-ir-mpd.service
+		rm /etc/systemd/system/justboom-ir-mpd.service
+
+		sed -i '/dtoverlay=lirc-rpi/d' "$FP_RPI_CONFIG"
+		sed -i '/dtparam=gpio_in_pin=25/d' "$FP_RPI_CONFIG"
+
+	}
+
 	RemoteIR_Main(){
 
 		if [ "$INPUT_DEVICE_VALUE" = "odroid_remote" ]; then
 
-			# - LIRC
-			if (( ! $(dpkg --get-selections | grep -ci -m1 '^lirc') )); then
-
-				apt-get update
-				apt-get install -y lirc
-				if (( $? != 0 )); then
-
-					/DietPi/dietpi/func/dietpi-notify 1 "apt-get install lirc"
-					EXIT_CODE=1
-
-				fi
-
-			fi
+			RemoteIR_Prereqs
+			RemoteIR_Reset_All &> /dev/null
 
 			# - xu4 Cloudshell
 			if (( $HW_MODEL == 11 )); then
@@ -229,13 +332,143 @@ begin remote
 end remote
 _EOF_
 
+		elif [ "$INPUT_DEVICE_VALUE" = "justboom_ir_remote" ]; then
+
+			RemoteIR_Prereqs
+			RemoteIR_Reset_All &> /dev/null
+
+			cat << _EOF_ >> "$FP_RPI_CONFIG"
+dtoverlay=lirc-rpi
+dtparam=gpio_in_pin=25
+_EOF_
+
+			cat << _EOF_ > /etc/lirc/hardware.conf
+LIRCD_ARGS="--uinput"
+LOAD_MODULES=true
+DRIVER="default"
+DEVICE="/dev/lirc0"
+MODULES="lirc_rpi"
+LIRCD_CONF=""
+LIRCMD_CONF=""
+_EOF_
+
+				cat << _EOF_ > /etc/lirc/lircd.conf
+begin remote
+
+  name  lircd.conf
+  bits            5
+  flags RC5|CONST_LENGTH
+  eps            30
+  aeps          100
+
+  one           921   855
+  zero          921   855
+  plead         936
+  pre_data_bits   8
+  pre_data       0xA0
+  gap          114211
+  toggle_bit_mask 0x800
+
+  suppress_repeat 5
+  duty_cycle 300
+
+  begin codes
+
+        KEY_HOME 0x10
+        KEY_POWER 0x11
+        KEY_MUTE 0x12
+        KEY_LEFT 0x13
+        KEY_RIGHT 0x14
+        KEY_ENTER 0x15
+        KEY_MENU 0x16
+        KEY_BACK 0x17
+        KEY_VOLUMEDOWN 0x18
+        KEY_VOLUMEUP 0x19
+        KEY_UP 0x1A
+        KEY_DOWN 0x1B
+
+      end codes
+
+end remote
+_EOF_
+
+			# + MPD control
+			if (( ! $(dpkg --get-selections | grep -ci -m1 '^mpc[[:space:]]') )); then
+
+				apt-get install -y mpc
+
+			fi
+
+			cat << _EOF_ > ~/.lircrc
+begin
+prog = irexec
+button = KEY_ENTER
+config = mpc toggle
+end
+begin
+prog = irexec
+button = KEY_VOLUMEUP
+config = mpc volume +2
+end
+begin
+prog = irexec
+button = KEY_VOLUMEDOWN
+config = mpc volume -2
+end
+begin
+prog = irexec
+button = KEY_RIGHT
+config = mpc next
+end
+begin
+prog = irexec
+button = KEY_LEFT
+config = mpc prev
+end
+begin
+prog = irexec
+button = KEY_UP
+config = mpc seek +00:00:10
+end
+begin
+prog = irexec
+button = KEY_DOWN
+config = mpc seek -00:00:10
+end
+begin
+prog = irexec
+button = KEY_BACK
+config = mpc repeat on
+end
+begin
+prog = irexec
+button = KEY_MENU
+config = mpc repeat off
+end
+_EOF_
+
+			#	service
+			cat << _EOF_ > /etc/systemd/system/justboom-ir-mpd.service
+[Unit]
+Description=justboom-ir-mpd
+After=sound.target lirc.service
+
+[Service]
+User=$USER
+Type=simple
+
+ExecStart=/usr/bin/irexec
+
+[Install]
+WantedBy=default.target
+_EOF_
+			systemctl enable justboom-ir-mpd.service
+			systemctl daemon-reload
+			systemctl start justboom-ir-mpd.service
 
 		elif [ "$INPUT_DEVICE_VALUE" = "none" ]; then
 
-			# - Disable odroids
-			systemctl stop odroid-remote
-			systemctl disable odroid-remote
-			rm /etc/systemd/system/odroid-remote.service
+			RemoteIR_Reset_All &> /dev/null
 
 		else
 
@@ -250,25 +483,75 @@ _EOF_
 	#/////////////////////////////////////////////////////////////////////////////////////
 	Kernel_Main(){
 
-		if [ "$INPUT_DEVICE_VALUE" = "384khz_rpi" ]; then
+		if [ "$INPUT_DEVICE_VALUE" = "dietpi_rpi" ]; then
 
-			local install_url_address='http://dietpi.com/downloads/binaries/rpi/rpi2plus-4.4.30_384khz.7z'
+			local install_url_address='http://dietpi.com/downloads/binaries/rpi/dietpi_rpi_kernel_4.9.zip'
 
 			/DietPi/dietpi/func/check_connection "$install_url_address"
 
 			#	Install
-			if (( $? == 0 )) &&
-				[ ! -f /etc/dietpi/.384khz_rpi ]; then #not already installed
+			if (( $? == 0 )); then
 
 				# - Prevent kernel/firmware/bootloader upgrades from Raspbian repo
-				apt-mark hold raspberrypi-bootloader raspberrypi-kernel libraspberrypi-bin
+				apt-mark hold raspberrypi-bootloader raspberrypi-kernel
+
+				wget "$install_url_address" -O package.zip
+				#	Cleanup disabled: https://github.com/Fourdee/DietPi/issues/905#issuecomment-298343932
+				# rm -R /boot/overlays/*
+				# rm -R /lib/modules/*
+				# rm -R /lib/firmware/*
+				# rm /boot/*.img
+
+				unzip -o package.zip -d /
+				if (( $? != 0 )); then
+
+					/DietPi/dietpi/func/dietpi-notify 1 "Failed to extract kernel $INPUT_DEVICE_NAME."
+
+				fi
+
+				rm package.zip
+
+				# - flag
+				echo 1 > /etc/dietpi/.dietpi_rpi
+
+			else
+
+				/DietPi/dietpi/func/dietpi-notify 1 "Failed to install $INPUT_DEVICE_NAME. $install_url_address may be offline or unreachable."
+
+			fi
+
+		elif [ "$INPUT_DEVICE_VALUE" = "sparky_sbc" ]; then
+
+			local install_url_address='https://github.com/sparkysbc/sparky_linux_images/raw/master/usbdac_mod_uImage.tar.bz2'
+
+			/DietPi/dietpi/func/check_connection "$install_url_address"
+
+			#	Install
+			if (( $? == 0 )); then
+
+				wget "$install_url_address" -O package.bz2
+				tar -jxvf package.bz2 -C /boot
+
+				rm package.bz2
+
+			else
+
+				/DietPi/dietpi/func/dietpi-notify 1 "Failed to install $INPUT_DEVICE_NAME. $install_url_address may be offline or unreachable."
+
+			fi
+
+		elif [ "$INPUT_DEVICE_VALUE" = "nanopim3" ]; then
+
+			local install_url_address='http://dietpi.com/downloads/binaries/nanopi/dietpi_m3_kernel.7z'
+
+			/DietPi/dietpi/func/check_connection "$install_url_address"
+
+			#	Install
+			if (( $? == 0 )); then
 
 				wget "$install_url_address" -O package.7z
-				7z x -aoa package.7z -o/
+				7z x -y package.7z -o/
 				rm package.7z
-
-				# - flag, trigger to enable 384khz in dietpi-justboom
-				echo 1 > /etc/dietpi/.384khz_rpi
 
 			else
 
@@ -343,8 +626,8 @@ _EOF_
 				sleep 1
 				apt-get install -y libgl1-mesa-dri mesa-utils
 
-				sed -i '/dtoverlay=vc4-kms-v3d/d' /DietPi/config.txt
-				echo -e "\ndtoverlay=vc4-kms-v3d" >> /DietPi/config.txt
+				sed -i '/dtoverlay=vc4-kms-v3d/d' "$FP_RPI_CONFIG"
+				echo -e "\ndtoverlay=vc4-kms-v3d" >> "$FP_RPI_CONFIG"
 
 			else
 
@@ -355,7 +638,7 @@ _EOF_
 
 		elif [ "$INPUT_DEVICE_VALUE" = "disable" ]; then
 
-			sed -i '/dtoverlay=vc4-kms-v3d/d' /DietPi/config.txt
+			sed -i '/dtoverlay=vc4-kms-v3d/d' "$FP_RPI_CONFIG"
 
 		else
 
@@ -481,11 +764,11 @@ _EOF_
 			#consoleblank=0 no effect
 			sed -i 's/rootwait/rootwait fbcon=map:10 fbcon=font:ProFont6x11 logo.nologo/' /boot/cmdline.txt
 
-			sed -i "/dtparam=i2c_arm=/c\dtparam=i2c_arm=on" /DietPi/config.txt
-			sed -i "/dtparam=spi=/c\dtparam=spi=on" /DietPi/config.txt
+			sed -i "/dtparam=i2c_arm=/c\dtparam=i2c_arm=on" "$FP_RPI_CONFIG"
+			sed -i "/dtparam=spi=/c\dtparam=spi=on" "$FP_RPI_CONFIG"
 
 
-			cat << _EOF_ >> /DietPi/config.txt
+			cat << _EOF_ >> "$FP_RPI_CONFIG"
 
 #Waveshare 32 LCD
 dtoverlay=waveshare32b:rotate=270
@@ -495,6 +778,12 @@ _EOF_
 
 			# - Swap input axis
 			sed -i '/"SwapAxes"/c\        Option  "SwapAxes"      "1"' /etc/X11/xorg.conf.d/99-waveshare32_calibration.conf
+
+			# - Use FBturbo
+			sed -i '/^Driver/c\Driver    "fbturbo"' /etc/X11/xorg.conf.d/99-waveshare32_xorg.conf
+
+			# - Move fb0 xorg.conf out the way: https://github.com/Fourdee/DietPi/issues/767
+			mv /usr/share/X11/xorg.conf.d/99-fbturbo.conf /usr/share/X11/99-fbturbo.conf
 
 		#Odroids
 		elif (( $HW_MODEL >= 10 && $HW_MODEL < 20 )); then
@@ -562,14 +851,17 @@ _EOF_
 			rm /boot/overlays/waveshare32b.dtbo
 			sed -i 's/ fbcon=map:10 fbcon=font:ProFont6x11 logo.nologo//' /boot/cmdline.txt
 
-			sed -i '/Waveshare 32 LCD/d' /DietPi/config.txt
-			sed -i '/dtoverlay=waveshare32b/d' /DietPi/config.txt
-			sed -i '/dtoverlay=ads7846,cs=1,penirq=17/d' /DietPi/config.txt
-			sed -i '/dtoverlay=w1-gpio-pullup,gpiopin=4,extpullup=1/d' /DietPi/config.txt
+			sed -i '/Waveshare 32 LCD/d' "$FP_RPI_CONFIG"
+			sed -i '/dtoverlay=waveshare32b/d' "$FP_RPI_CONFIG"
+			sed -i '/dtoverlay=ads7846,cs=1,penirq=17/d' "$FP_RPI_CONFIG"
+			sed -i '/dtoverlay=w1-gpio-pullup,gpiopin=4,extpullup=1/d' "$FP_RPI_CONFIG"
 
 			# - Leave these enabled, just incase the user has other hardware that may use them.
-			#sed -i "/dtparam=i2c_arm=/c\dtparam=i2c_arm=on" /DietPi/config.txt
-			#sed -i "/dtparam=spi=/c\dtparam=spi=on" /DietPi/config.txt
+			#sed -i "/dtparam=i2c_arm=/c\dtparam=i2c_arm=on" "$FP_RPI_CONFIG"
+			#sed -i "/dtparam=spi=/c\dtparam=spi=on" "$FP_RPI_CONFIG"
+
+			# - Move fb0 xorg.conf back: https://github.com/Fourdee/DietPi/issues/767
+			mv /usr/share/X11/99-fbturbo.conf /usr/share/X11/xorg.conf.d/99-fbturbo.conf
 
 		#Odroids
 		elif (( $HW_MODEL >= 10 && $HW_MODEL < 20 )); then
@@ -594,6 +886,7 @@ _EOF_
 
 		echo -e "spi_s3c64xx" >> /etc/modules
 		echo -e "fbtft_device" >> /etc/modules
+		echo -e "fbtft_device" >> /etc/modules #XU4 4.9 workaround: https://github.com/Fourdee/DietPi/issues/926#issuecomment-299480918
 
 	}
 
@@ -777,8 +1070,8 @@ _EOF_
 			sed -i '/blacklist i2c-bcm2708/d' /etc/modprobe.d/raspi-blacklist.conf &> /dev/null
 
 			#config.txt
-			sed -i "/dtparam=i2c_arm=/c\dtparam=i2c_arm=on" /DietPi/config.txt
-			sed -i "/dtparam=i2c1=/c\dtparam=i2c1=on" /DietPi/config.txt
+			sed -i "/dtparam=i2c_arm=/c\dtparam=i2c_arm=on" "$FP_RPI_CONFIG"
+			sed -i "/dtparam=i2c1=/c\dtparam=i2c1=on" "$FP_RPI_CONFIG"
 
 			#DietPi-Software, set installed
 			sed -i '/^aSOFTWARE_INSTALL_STATE\[72\]=/c\aSOFTWARE_INSTALL_STATE\[72\]=2' /DietPi/dietpi/.installed
@@ -787,14 +1080,14 @@ _EOF_
 
 			sed -i '/i2c-bcm2708/d' /etc/modules &> /dev/null
 			sed -i '/i2c-dev/d' /etc/modules &> /dev/null
-			sed -i "/dtparam=i2c_arm=/c\dtparam=i2c_arm=off" /DietPi/config.txt
-			sed -i "/dtparam=i2c1=/c\dtparam=i2c1=off" /DietPi/config.txt
-			sed -i "/i2c_arm_baudrate=/c\i2c_arm_baudrate=100000" /DietPi/config.txt
+			sed -i "/dtparam=i2c_arm=/c\dtparam=i2c_arm=off" "$FP_RPI_CONFIG"
+			sed -i "/dtparam=i2c1=/c\dtparam=i2c1=off" "$FP_RPI_CONFIG"
+			sed -i "/i2c_arm_baudrate=/c\i2c_arm_baudrate=100000" "$FP_RPI_CONFIG"
 
 		#Set baudrate (khz) | valid int
 		elif [[ $INPUT_DEVICE_VALUE =~ ^-?[0-9]+$ ]] && (( $INPUT_DEVICE_VALUE >= 2 )); then
 
-			sed -i "/i2c_arm_baudrate=/c\i2c_arm_baudrate=$(( $INPUT_DEVICE_VALUE * 1000 ))" /DietPi/config.txt
+			sed -i "/i2c_arm_baudrate=/c\i2c_arm_baudrate=$(( $INPUT_DEVICE_VALUE * 1000 ))" "$FP_RPI_CONFIG"
 
 			#inform user
 			INPUT_DEVICE_VALUE+="Khz"
@@ -837,7 +1130,8 @@ _EOF_
 			fi
 
 			# + RPi 3 (apply to all, as pi-bluetooth package is default installed on all RPi's now)
-			if (( $HW_MODEL < 10 )); then
+			#	+ Asus TB
+			if (( $HW_MODEL < 10 || $HW_MODEL == 100 )); then
 
 				systemctl stop hciuart
 				systemctl disable hciuart
@@ -898,8 +1192,8 @@ _EOF_
 
 			fi
 
-			# + RPi 3
-			if (( $HW_MODEL == 3 )); then
+			# + RPi 3/ZeroW
+			if (( $HW_ONBOARD_WIFI == 1 )); then
 
 				#pi-bluetooth contains hciuart service and also pulls in firmware: https://github.com/Fourdee/DietPi/issues/693
 				#	Installed by default as of v142
@@ -935,8 +1229,18 @@ _EOF_
 
 			fi
 
+			#	+ Asus TB
+			if (( $HW_MODEL == 100 )); then
+
+				systemctl enable hciuart
+				systemctl start hciuart
+
+			fi
+
 		else
+
 			Unknown_Input_Mode
+
 		fi
 
 		unset aBLUETOOTH_MODULES
@@ -997,13 +1301,13 @@ _EOF_
 
 			aWIFI_MODULES+=("8189es")
 
-		# + Pine A64
-		elif (( $HW_MODEL >= 40 && $HW_MODEL < 50 )); then
+		# + Pine A64 / Asus tinker board (onboard)
+		elif (( ( $HW_MODEL >= 40 && $HW_MODEL < 50 ) || $HW_MODEL == 100 )); then
 
-			aWIFI_MODULES+=("8723bs") #addon WiFi/BT board.
+			aWIFI_MODULES+=("8723bs")
 
-		# + NanoPi NEO Air
-		elif (( $HW_MODEL == 64 )); then
+		# + NanoPi NEO Air / Zero 2+
+		elif (( $HW_MODEL == 35 || $HW_MODEL == 64 )); then
 
 			#4.9 uses brcm, only enable dhd for 3.x
 			if [ ! -d /boot/dtb ]; then
@@ -1031,6 +1335,10 @@ _EOF_
 
 			done
 
+			#Disable powersave being applied
+			systemctl disable wifi_disable_powersave
+			rm /etc/systemd/system/wifi_disable_powersave.service &> /dev/null
+
 		# - Enable
 		elif [ "$INPUT_DEVICE_VALUE" = "enable" ]; then
 
@@ -1057,12 +1365,29 @@ _EOF_
 			#Update our networking file (refresh active wlan index)
 			/DietPi/dietpi/func/obtain_network_details
 
+			#Disable powersave on boot service:
+			cat << _EOF_ > /etc/systemd/system/wifi_disable_powersave.service
+[Unit]
+Description=Disable WiFi power management
+After=network.target network-online.target
+
+[Service]
+Type=simple
+RemainAfterExit=yes
+ExecStart=/bin/bash -c 'sleep 20;iwconfig wlan$(sed -n 2p /DietPi/dietpi/.network) power off
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+			systemctl daemon-reload
+			systemctl enable wifi_disable_powersave
+			systemctl start wifi_disable_powersave
+
 		elif [ "$INPUT_DEVICE_VALUE" = "onboard_enable" ]; then
 
 			#NB: Requires reboot
 			#NB: Do not change filenames, -f check used by DietPi-Config to obtain state
 
-			# - RPi 3
 			rm /etc/modprobe.d/disable_wifi_rpi3_onboard.conf &> /dev/null
 
 		elif [ "$INPUT_DEVICE_VALUE" = "onboard_disable" ]; then
@@ -1070,7 +1395,7 @@ _EOF_
 			#NB: Requires reboot
 			#NB: Do not change filenames, -f check used by DietPi-Config to obtain state
 
-			# - RPi 3
+			# - RPi 3/ZeroW
 			echo -e "blacklist brcmfmac" > /etc/modprobe.d/disable_wifi_rpi3_onboard.conf
 			echo -e "blacklist brcmutil" >> /etc/modprobe.d/disable_wifi_rpi3_onboard.conf
 
@@ -1105,6 +1430,10 @@ _EOF_
 			if (( $(lsmod | grep -ci -m1 '^cfg80211') )); then
 
 				iw reg set "$INPUT_DEVICE_VALUE"
+
+				#Apply to module params aswell: https://github.com/Fourdee/DietPi/issues/838
+				echo -e "options cfg80211 ieee80211_regdom=$INPUT_DEVICE_VALUE" > /etc/modprobe.d/cfg80211.conf
+
 				EXIT_CODE=$?
 
 			fi
@@ -1154,7 +1483,7 @@ _EOF_
 				if (( $HW_MODEL == 3 )); then
 
 					# - Must use 250mhz core frequency, else, corrupt characters: https://github.com/Fourdee/DietPi/issues/306#issuecomment-222304202
-					sed -i '/core_freq=/c\core_freq=250' /DietPi/config.txt
+					sed -i '/core_freq=/c\core_freq=250' "$FP_RPI_CONFIG"
 
 				fi
 
@@ -1220,9 +1549,9 @@ _EOF_
 
 				# RPi 3 - Put core freq back to default (400mhz), if set to 250mhz.
 				if (( $HW_MODEL == 3 &&
-					$(cat /DietPi/config.txt | grep -m1 'core_freq=' | sed 's/.*=//') == 250 )); then
+					$(cat "$FP_RPI_CONFIG" | grep -m1 'core_freq=' | sed 's/.*=//') == 250 )); then
 
-					sed -i '/core_freq=/c\#core_freq=400' /DietPi/config.txt
+					sed -i '/core_freq=/c\#core_freq=400' "$FP_RPI_CONFIG"
 
 				fi
 
@@ -1265,7 +1594,7 @@ _EOF_
 	SOUNDCARD_TARGET_DEVICE=0
 	ALSA_EQ_ENABLED=0
 
-	#Disable all soundcards and revert back to HDMI output if available.
+	#Disable all soundcards and revert back to default output if available.
 	Soundcard_Reset_All(){
 
 		SOUNDCARD_TARGET_CARD=0
@@ -1319,6 +1648,11 @@ _EOF_
 
 			Soundcard_Reset_SparkySBC
 
+		#ASUS
+		elif (( $HW_MODEL == 100 )); then
+
+			Soundcard_Reset_Asus
+
 		fi
 
 	}
@@ -1327,23 +1661,29 @@ _EOF_
 
 		# - Add dtparam=audio=off
 		#	as of 4.4 kernel: https://github.com/Fourdee/DietPi/issues/327
-		if (( $(cat /DietPi/config.txt | grep -ci -m1 'dtparam=audio=') == 0 )); then
-			echo -e "dtparam=audio=off" >> /DietPi/config.txt
+		if (( $(cat "$FP_RPI_CONFIG" | grep -ci -m1 'dtparam=audio=') == 0 )); then
+
+			echo -e "dtparam=audio=off" >> "$FP_RPI_CONFIG"
+
 		else
-			sed -i '/dtparam=audio=/c\dtparam=audio=off' /DietPi/config.txt
+
+			sed -i '/dtparam=audio=/c\dtparam=audio=off' "$FP_RPI_CONFIG"
+
 		fi
 
 		# - Disable known soundcard dtoverlays
-		sed -i '/dtoverlay=rpi-bcm2835/d' /DietPi/config.txt
-		sed -i '/dtoverlay=hifiberry/d' /DietPi/config.txt
-		sed -i '/dtoverlay=iqaudio/d' /DietPi/config.txt
-		sed -i '/dtoverlay=justboom/d' /DietPi/config.txt
-		sed -i '/dtoverlay=allo-piano-dac/d' /DietPi/config.txt
+		sed -i '/dtoverlay=rpi-bcm2835/d' "$FP_RPI_CONFIG"
+		sed -i '/dtoverlay=hifiberry/d' "$FP_RPI_CONFIG"
+		sed -i '/dtoverlay=iqaudio/d' "$FP_RPI_CONFIG"
+		sed -i '/dtoverlay=justboom/d' "$FP_RPI_CONFIG"
+		sed -i '/dtoverlay=allo-/d' "$FP_RPI_CONFIG"
+		sed -i '/dtoverlay=rpi-dac/d' "$FP_RPI_CONFIG"
+		sed -i '/dtoverlay=i-sabre-k2m/d' "$FP_RPI_CONFIG"
 
 		#	onboard blacklist module
 		echo -e "blacklist snd-bcm2835" > /etc/modprobe.d/rpi-bcm2708.conf
 
-		sed -i '/avoid_pwm_pll=/c\avoid_pwm_pll=1' /DietPi/config.txt
+		sed -i '/avoid_pwm_pll=/c\avoid_pwm_pll=1' "$FP_RPI_CONFIG"
 
 		# - forced analogue out
 		systemctl disable rpi-bcm2835_forced_3.5mm.service &> /dev/null
@@ -1381,6 +1721,13 @@ _EOF_
 
 	}
 
+	Soundcard_Reset_Asus(){
+
+		#set hdmi
+		SOUNDCARD_TARGET_CARD=1
+
+	}
+
 	Soundcard_Reset_SparkySBC(){
 
 		sed -i '/snd-soc-allo-piano-dac/d' /etc/modules
@@ -1399,8 +1746,16 @@ _EOF_
 
 	Soundcard_Reset_BPi_Pro(){
 
-		#HDMI
-		SOUNDCARD_TARGET_CARD=2
+		#3.5mm: https://github.com/Fourdee/DietPi/issues/732#issuecomment-275915919
+		SOUNDCARD_TARGET_CARD=0
+
+		amixer sset 'Left Mixer Left DAC' off
+		amixer sset 'Power Amplifier' 62
+		amixer sset 'Power Amplifier DAC' on
+		amixer sset 'Power Amplifier Mixer' off
+		amixer sset 'Power Amplifier Mute' on
+		amixer sset 'Right Mixer Left DAC' off
+		amixer sset 'Right Mixer Right DAC' off
 
 	}
 
@@ -1429,7 +1784,7 @@ _EOF_
 		if (( $HW_MODEL < 10 )); then
 
 			# - Enable dtparam audio
-			sed -i '/dtparam=audio=/c\dtparam=audio=on' /DietPi/config.txt
+			sed -i '/dtparam=audio=/c\dtparam=audio=on' "$FP_RPI_CONFIG"
 
 		fi
 
@@ -1469,12 +1824,12 @@ _EOF_
 				rm /etc/modprobe.d/rpi-bcm2708.conf
 
 				# - Enable HQ audio
-				sed -i '/avoid_pwm_pll=/c\avoid_pwm_pll=0' /DietPi/config.txt
+				sed -i '/avoid_pwm_pll=/c\avoid_pwm_pll=0' "$FP_RPI_CONFIG"
 
 				# - Expermental UltraHQ audio: https://www.raspberrypi.org/forums/viewtopic.php?p=907075#p907075
 				if [[ $INPUT_DEVICE_VALUE == *ultrahq* ]]; then
 
-					sed -i '/avoid_pwm_pll=/c\avoid_pwm_pll=2' /DietPi/config.txt
+					sed -i '/avoid_pwm_pll=/c\avoid_pwm_pll=2' "$FP_RPI_CONFIG"
 
 				fi
 
@@ -1512,7 +1867,7 @@ _EOF_
 			hifiberry-*)
 
 				# - enable dtoverlay
-				echo -e "\ndtoverlay=$INPUT_DEVICE_VALUE" >> /DietPi/config.txt
+				echo -e "\ndtoverlay=$INPUT_DEVICE_VALUE" >> "$FP_RPI_CONFIG"
 
 			;;
 
@@ -1521,7 +1876,7 @@ _EOF_
 			justboom-*)
 
 				# - enable dtoverlay
-				echo -e "\ndtoverlay=$INPUT_DEVICE_VALUE" >> /DietPi/config.txt
+				echo -e "\ndtoverlay=$INPUT_DEVICE_VALUE" >> "$FP_RPI_CONFIG"
 
 			;;
 
@@ -1534,7 +1889,7 @@ _EOF_
 			*allo-piano-dac*)
 
 				# - enable dtoverlay
-				echo -e "\ndtoverlay=$INPUT_DEVICE_VALUE" >> /DietPi/config.txt
+				echo -e "\ndtoverlay=$INPUT_DEVICE_VALUE" >> "$FP_RPI_CONFIG"
 
 				# + Sparky SBC
 				if (( $HW_MODEL == 70 )); then
@@ -1548,7 +1903,84 @@ _EOF_
 
 			;;
 
-			#Sparky SBC
+			#RPi (dtoverlay)
+			#	allo-boss-dac-pcm512x-audio
+			*allo-boss-dac*)
+
+				# - enable dtoverlay
+				echo -e "\ndtoverlay=$INPUT_DEVICE_VALUE" >> "$FP_RPI_CONFIG"
+
+			;;
+
+			#RPi (dtoverlay)
+			#	allo-digione
+			*allo-digione*)
+
+				# - enable dtoverlay
+				echo -e "\ndtoverlay=$INPUT_DEVICE_VALUE" >> "$FP_RPI_CONFIG"
+
+			;;
+
+			#RPi (dtoverlay)
+			#	rpi-dac
+			rpi-dac)
+
+				# - enable dtoverlay
+				echo -e "\ndtoverlay=$INPUT_DEVICE_VALUE" >> "$FP_RPI_CONFIG"
+
+			;;
+
+			#AudioPhonics I-Sabre-K2M (dtoverlay)
+			#	i-sabre-k2m
+			i-sabre-k2m)
+
+				# - Install binaries
+				local install_url_address='http://dietpi.com/downloads/binaries/rpi/I-Sabre-K2M_binaries.7z'
+
+				/DietPi/dietpi/func/check_connection "$install_url_address"
+				if (( $? == 0 )); then
+
+					wget "$install_url_address" -O package.7z
+					7z x -y package.7z
+					rm package.7z
+
+					#	ARMv6
+					if (( $HW_ARCH == 1 )); then
+
+						mv armv6/i-sabre-codec.ko /lib/modules/$(uname -r)/kernel/sound/soc/codecs/
+						mv armv6/i-sabre-k2m.ko /lib/modules/$(uname -r)/kernel/sound/soc/bcm/
+
+					#	ARMv7
+					elif (( $HW_ARCH == 2 )); then
+
+						mv armv7/i-sabre-codec.ko /lib/modules/$(uname -r)/kernel/sound/soc/codecs/
+						mv armv7/i-sabre-k2m.ko /lib/modules/$(uname -r)/kernel/sound/soc/bcm/
+
+					fi
+
+					mv i-sabre-k2m.dtbo /boot/overlays/
+
+					sync
+					depmod -a
+
+					rm -R armv6
+					rm -R armv7
+
+					# - enable dtoverlay
+					echo -e "\ndtoverlay=$INPUT_DEVICE_VALUE" >> "$FP_RPI_CONFIG"
+
+					# - i2c
+					sed -i '/dtparam=i2c_arm=/c\dtparam=i2c_arm=on' "$FP_RPI_CONFIG"
+
+				else
+
+					/DietPi/dietpi/func/dietpi-notify 1 "Failed to install $INPUT_DEVICE_NAME. $install_url_address may be offline or unreachable."
+
+				fi
+
+			;;
+
+			#Sparky SBC -------------------------------------------------------------------------------
 			#allo-cheapo-analogue	#3.5mm/RCA
 			#allo-cheapo-optical	#Optical out
 			allo-cheapo*)
@@ -1566,15 +1998,16 @@ _EOF_
 				else
 
 					amixer -c 0 sset 'audio output mode switch' 'spdif'
+					SOUNDCARD_TARGET_DEVICE=2
 
 				fi
 
 			;;
 
-			iqaudio-dacplus*)
+			iqaudio-*)
 
 				# - enable dtoverlay
-				echo -e "\ndtoverlay=$INPUT_DEVICE_VALUE" >> /DietPi/config.txt
+				echo -e "\ndtoverlay=$INPUT_DEVICE_VALUE" >> "$FP_RPI_CONFIG"
 
 			;;
 
@@ -1620,6 +2053,13 @@ _EOF_
 
 			;;
 
+			#H2 -------------------------------------------------------------------------------
+			h2-hdmi)
+
+				SOUNDCARD_TARGET_CARD=1
+
+			;;
+
 			#H3 -------------------------------------------------------------------------------
 			h3-analogue)
 
@@ -1645,6 +2085,14 @@ _EOF_
 			s5pxx18-hdmi)
 
 				SOUNDCARD_TARGET_CARD=1
+
+			;;
+
+			#Asus tinker -------------------------------------------------------------------------------
+			asus-tb-analogue)
+
+				SOUNDCARD_TARGET_CARD=0
+				SOUNDCARD_TARGET_DEVICE=2
 
 			;;
 
@@ -1766,6 +2214,10 @@ _EOF_
 	elif [ "$INPUT_DEVICE_NAME" = "rpi-camera" ]; then
 
 		RPi_Camera_Main
+
+	elif [ "$INPUT_DEVICE_NAME" = "rpi3_usb_boot" ]; then
+
+		RPi_USB_Boot_Main
 
 	else
 

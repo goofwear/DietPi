@@ -27,20 +27,20 @@ exit 0 #prevent continuation of this script.
 
 #  - C2
 # cat << _EOF_ > /etc/apt/sources.list
-# deb http://ftp.debian.org/debian jessie main contrib non-free
-# deb http://ftp.debian.org/debian jessie-updates main contrib non-free
+# deb http://ftp.debian.org/debian/ jessie main contrib non-free
+# deb http://ftp.debian.org/debian/ jessie-updates main contrib non-free
 # deb http://security.debian.org jessie/updates main contrib non-free
-# deb http://ftp.debian.org/debian jessie-backports main contrib non-free
-# deb http://ftp.debian.org/debian jessie-proposed-updates contrib non-free main
+# deb http://ftp.debian.org/debian/ jessie-backports main contrib non-free
+# deb http://ftp.debian.org/debian/ jessie-proposed-updates contrib non-free main
 # _EOF_
 
 # 	C2	stretch
 # cat << _EOF_ > /etc/apt/sources.list
-# deb http://ftp.debian.org/debian stretch main contrib non-free
-# deb http://ftp.debian.org/debian stretch-updates main contrib non-free
+# deb http://ftp.debian.org/debian/ stretch main contrib non-free
+# deb http://ftp.debian.org/debian/ stretch-updates main contrib non-free
 # deb http://security.debian.org stretch/updates main contrib non-free
-# deb http://ftp.debian.org/debian stretch-backports main contrib non-free
-# deb http://ftp.debian.org/debian stretch-proposed-updates contrib non-free main
+# deb http://ftp.debian.org/debian/ stretch-backports main contrib non-free
+# deb http://ftp.debian.org/debian/ stretch-proposed-updates contrib non-free main
 # _EOF_
 # apt-get update
 # apt-get install busybox-static
@@ -58,22 +58,23 @@ exit 0 #prevent continuation of this script.
 # apt-get autoremove --purge -y
 
 
-# deb-src http://ftp.debian.org/debian jessie main contrib non-free
-# deb-src http://ftp.debian.org/debian jessie-updates main contrib non-free
+# deb-src http://ftp.debian.org/debian/ jessie main contrib non-free
+# deb-src http://ftp.debian.org/debian/ jessie-updates main contrib non-free
 # deb-src http://security.debian.org jessie/updates main contrib non-free
-# deb-src http://ftp.debian.org/debian jessie-backports main contrib non-free
-# deb-src http://ftp.debian.org/debian jessie-proposed-updates contrib non-free main
+# deb-src http://ftp.debian.org/debian/ jessie-backports main contrib non-free
+# deb-src http://ftp.debian.org/debian/ jessie-proposed-updates contrib non-free main
 
 
 #NOTE:
 #Apt mirror will get overwritten by: /DietPi/dietpi/func/dietpi-set_software apt-mirror default : during finalize.
 
 # - Everything else (excluding RPi!)
+DISTRO='jessie'
 cat << _EOF_ > /etc/apt/sources.list
-deb http://ftp.debian.org/debian jessie main contrib non-free
-deb http://ftp.debian.org/debian jessie-updates main contrib non-free
-deb http://security.debian.org jessie/updates main contrib non-free
-deb http://ftp.debian.org/debian jessie-backports main contrib non-free
+deb http://ftp.debian.org/debian/ $DISTRO main contrib non-free
+deb http://ftp.debian.org/debian/ $DISTRO-updates main contrib non-free
+deb http://security.debian.org $DISTRO/updates main contrib non-free
+deb http://ftp.debian.org/debian/ $DISTRO-backports main contrib non-free
 _EOF_
 
 # RPI UK mirror director is slow, unstable and unreliable -------------------------
@@ -94,23 +95,21 @@ rm /etc/apt/sources.list.d/deb-multimedia.list
 #Remove following Jessie
 apt-get clean
 apt-get update
-apt-get purge -y libboost-iostreams* sgml-base xml-core usb-modeswitch* libpng* cpp-* cpp ntpdate bluez bluetooth rsync dialog dhcpcd5 libsqlite* libxapian22 lua5.1 netcat-* make makedev ncdu plymouth openresolv shared-mime-in* tcpd strace tasksel* wireless-* xdg-user-dirs triggerhappy python* v4l-utils traceroute xz-utils ucf xauth zlib1g-dev xml-core aptitude* avahi-daemon rsyslog logrotate man-db manpages vim vim-common vim-runtime vim-tiny mc mc-data
+apt-get purge -y libxapian22 gpsd ppp libboost-iostreams* sgml-base xml-core usb-modeswitch* libpng* cpp-* cpp ntpdate bluez bluetooth rsync dialog dhcpcd5 libsqlite* lua5.1 netcat-* make makedev ncdu plymouth openresolv shared-mime-in* tcpd strace tasksel* wireless-* xdg-user-dirs triggerhappy python* v4l-utils traceroute xz-utils ucf xauth zlib1g-dev xml-core aptitude* avahi-daemon rsyslog logrotate man-db manpages vim vim-common vim-runtime vim-tiny mc mc-data
 
 #+Desktop images (Mostly desktop packages, but apply to non-desktop images also):
 apt-get purge -y libpod-* libpeas-* isc-dhcp-server gnome-* fonts-dejavu* eject dnsmasq* dns-root-data colord-data libturbojpeg1 libjasper* libjson* libwbclient* libwayland* golang-* libavahi* libtext* libweb* libpcsclite1 libxau6* libvpx1 libxc* dictionaries-* libgtk* miscfiles minicom lrzsz lxmenu-* x11-* zenity* yelp-*
 
+rm -R /usr/share/fonts/*
+rm -R /usr/share/icons/*
+
 #+armbian
-apt-get purge -y toilet toilet-fonts w-scan vlan weather-util* sysbench stress apt-transport-* cmake cmake-data device-tree-co* fping hddtemp haveged hostapd i2c-tools iperf ir-keytable libasound2* libmtp* libusb-dev lirc lsof ncurses-term pkg-config unicode-data rfkill pv mtp-tools m4 screen alsa-utils autotools-dev bind9-host btrfs-tools bridge-utils cpufrequtils dvb-apps dtv-scan-table* evtest f3 figlet gcc gcc-4.8-* git git-man iozone3 ifenslave
+apt-get purge -y expect tcl-expect toilet toilet-fonts w-scan vlan weather-util* sysbench stress cmake cmake-data device-tree-co* fping hddtemp haveged hostapd i2c-tools iperf ir-keytable libasound2* libmtp* libusb-dev lirc lsof ncurses-term pkg-config unicode-data rfkill pv mtp-tools m4 screen alsa-utils autotools-dev bind9-host btrfs-tools bridge-utils cpufrequtils dvb-apps dtv-scan-table* evtest f3 figlet gcc gcc-4.8-* git git-man iozone3 ifenslave
 #apt-get purge -y linux-jessie-root-*
 
 #+ dev packages
+#	On ARMbian DEV branch images, manually do this as triggers '*-dev' image/uboot etc
 apt-get purge -y '\-dev$' linux-headers*
-
-#+ Misc
-#rm /etc/apt/sources.list.d/armbian.list
-rm /etc/init.d/resize2fs
-systemctl daemon-reload
-rm /etc/update-motd.d/*
 
 #??? RPI
 apt-get purge -y libraspberrypi-doc
@@ -124,13 +123,10 @@ apt-get dist-upgrade -y
 
 #install packages
 echo -e "CONF_SWAPSIZE=0" > /etc/dphys-swapfile
-apt-get install -y apt-transport-https ethtool p7zip-full hfsplus iw debconf-utils xz-utils fbset wpasupplicant resolvconf bc dbus bzip2 psmisc bash-completion cron whiptail sudo ntp ntfs-3g dosfstools parted hdparm pciutils usbutils zip htop wput wget fake-hwclock dphys-swapfile curl unzip ca-certificates console-setup console-data console-common keyboard-configuration wireless-tools wireless-regdb crda --no-install-recommends
-
-#??? NanoPi Neo Air 3.x kernel only (and possibily other ap62xx chipsets), required for ap6212 bt firmware service: https://github.com/Fourdee/DietPi/issues/602#issuecomment-262806470
-apt-get install rfkill
+apt-get install -y cron rfkill ca-certificates locales apt-transport-https ethtool p7zip-full hfsplus iw debconf-utils xz-utils fbset wpasupplicant resolvconf bc dbus bzip2 psmisc bash-completion cron whiptail sudo ntp ntfs-3g dosfstools parted hdparm pciutils usbutils zip htop wput wget fake-hwclock dphys-swapfile curl unzip console-setup console-data console-common keyboard-configuration wireless-tools wireless-regdb crda --no-install-recommends
 
 #??? bluetooth if onboard device / RPI
-apt-get install -y bluetooth
+apt-get install -y bluetooth bluez-firmware
 
 #??? RPi - bluetooth/firmware for RPi 3 (ALL)
 apt-get install -y pi-bluetooth
@@ -138,7 +134,7 @@ apt-get install -y pi-bluetooth
 apt-get install -y libraspberrypi-bin
 
 #??? Non-ARMbian images only: firmware
-apt-get install -y firmware-realtek firmware-ralink firmware-brcm80211 firmware-atheros -y --no-install-recommends
+apt-get install -y firmware-realtek firmware-ralink firmware-brcm80211 firmware-atheros --no-install-recommends
 
 #------------------------------------------------------------------------------------------------
 #DIETPI STUFF
@@ -151,16 +147,39 @@ userdel -f test #armbian
 
 #Remove folders (now in finalise script)
 
-#Remove files
+#+Remove files
+#rm /etc/apt/sources.list.d/armbian.list
+rm /etc/init.d/resize2fs
+rm /etc/update-motd.d/* # ARMbian
+
+systemctl disable firstrun
+rm /etc/init.d/firstrun # ARMbian
+
+#	Disable ARMbian's log2ram: https://github.com/Fourdee/DietPi/issues/781
+systemctl disable log2ram.service
+systemctl stop log2ram.service
+rm /usr/local/sbin/log2ram
+rm /etc/systemd/system/log2ram.service
+systemctl daemon-reload
+rm /etc/cron.hourly/log2ram
+
 rm /etc/init.d/cpu_governor # Meveric
 rm /etc/systemd/system/cpu_governor.service # Meveric
+
+#	Disable ARMbian's resize service (not automatically removed by ARMbian scripts...)
+systemctl disable resize2fs
+rm /etc/systemd/system/resize2fs.service
+
+#	ARMbian-config
+rm /etc/profile.d/check_first_login_reboot.sh
+
+#Set UID bit for sudo: https://github.com/Fourdee/DietPi/issues/794
+chmod 4755 /usr/bin/sudo
 
 #Create DietPi common folders
 mkdir /DietPi
 
 mkdir -p /mnt/dietpi_userdata
-
-mkdir -p /mnt/usb_1
 
 mkdir -p /mnt/samba
 mkdir -p /mnt/ftp_client
@@ -181,10 +200,12 @@ mount -a
 cat << _EOF_ > /etc/systemd/system/dietpi-ramdisk.service
 [Unit]
 Description=DietPi-RAMdisk
+After=local-fs.target
 
 [Service]
 Type=forking
 RemainAfterExit=yes
+ExecStartPre=/bin/mkdir -p /etc/dietpi/logs
 ExecStart=/bin/bash -c '/boot/dietpi/dietpi-ramdisk 0'
 ExecStop=/bin/bash -c '/DietPi/dietpi/dietpi-ramdisk 1'
 
@@ -200,6 +221,7 @@ cat << _EOF_ > /etc/systemd/system/dietpi-ramlog.service
 [Unit]
 Description=DietPi-RAMlog
 Before=rsyslog.service syslog.service
+After=local-fs.target
 
 [Service]
 Type=forking
@@ -330,7 +352,7 @@ Dpkg::Options {
 }
 _EOF_
 
-#Stretch, disable automatic updates and management of apt cache. Prevents unexpected lock on Apt cache and therefore failed apt installations.
+#Disable automatic updates and management of apt cache. Prevents unexpected lock on Apt cache and therefore failed apt installations.
 systemctl mask apt-daily.service
 
 #/etc/sysctl.conf | Check for a previous entry before adding this
@@ -459,13 +481,26 @@ systemctl disable getty@tty[2-6].service
 #systemctl disable serial-getty@ttyS0.service
 
 #NTPd - remove systemd's version
-systemctl disable systemd-timesync
+systemctl disable systemd-timesyncd
 
+#+ARMbian increase console verbose
+sed -i '/verbosity=/c\verbosity=7' /boot/armbianEnv.txt
 
 
 dpkg-reconfigure tzdata #Europe > London
 dpkg-reconfigure keyboard-configuration #Keyboard must be plugged in for this to work!
 dpkg-reconfigure locales # en_GB.UTF8 as default and only installed locale
+
+#Pump default locale into sys env: https://github.com/Fourdee/DietPi/issues/825
+cat << _EOF_ > /etc/environment
+LC_ALL=en_GB.UTF-8
+LANG=en_GB.UTF-8
+_EOF_
+
+
+
+#??? ARMbian OPi Zero 2: https://github.com/Fourdee/DietPi/issues/876#issuecomment-294350580
+echo -e "blacklist bmp085" > /etc/modprobe.d/bmp085.conf
 
 #??? Sparky SBC ONLY: Blacklist GPU and touch screen modules: https://github.com/Fourdee/DietPi/issues/699#issuecomment-271362441
 cat << _EOF_ > /etc/modprobe.d/disable_sparkysbc_touchscreen.conf
@@ -482,6 +517,14 @@ _EOF_
 #??? RPI ONLY: Scroll lock fix for RPi by Midwan: https://github.com/Fourdee/DietPi/issues/474#issuecomment-243215674
 cat << _EOF_ > /etc/udev/rules.d/50-leds.rules
 ACTION=="add", SUBSYSTEM=="leds", ENV{DEVPATH}=="*/input*::scrolllock", ATTR{trigger}="kbd-scrollock"
+_EOF_
+
+#??? PINE (and possibily others): Cursor fix for FB
+cat << _EOF_ >> "$HOME"/.bashrc
+infocmp > terminfo.txt
+sed -i -e 's/?0c/?112c/g' -e 's/?8c/?48;0;64c/g' terminfo.txt
+tic terminfo.txt
+tput cnorm
 _EOF_
 
 #------------------------------------------------------------------------------------------------

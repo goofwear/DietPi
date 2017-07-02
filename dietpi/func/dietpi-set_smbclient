@@ -22,6 +22,9 @@
 	#Force en_GB Locale for whole script. Prevents incorrect parsing with non-english locales.
 	LANG=en_GB.UTF-8
 
+	#Ensure we are in users home dir: https://github.com/Fourdee/DietPi/issues/905#issuecomment-298223705
+	cd "$HOME"
+
 	INPUT=0
 	if [[ $1 =~ ^-?[0-9]+$ ]]; then
 		INPUT=$1
@@ -40,7 +43,7 @@
 	Apply_And_Mount(){
 
 		#Apply to fstab
-		sed -i "/\/mnt\/samba/c\\/\/$samba_clientname\/$samba_clientshare \/mnt\/samba cifs username=$samba_clientusename,password=$samba_clientpassword,_netdev,iocharset=utf8,sec=ntlm,nofail  0  0" /etc/fstab
+		sed -i "/\/mnt\/samba/c\\/\/$samba_clientname\/$samba_clientshare \/mnt\/samba cifs username=$samba_clientusename,password=$samba_clientpassword,iocharset=utf8,sec=ntlm,nofail  0  0" /etc/fstab
 
 		#Mount up
 		mount -a

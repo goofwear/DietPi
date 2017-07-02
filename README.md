@@ -124,6 +124,9 @@ Kodi / Xbmc
 Transmission
 - http://www.transmissionbt.com/download/
 
+Nextcloud
+- https://github.com/nextcloud/server
+ 
 OwnCloud
 - https://github.com/owncloud
 
@@ -185,7 +188,7 @@ Grasshopper
 - https://sourceforge.net/projects/grasshopperwebapp/Grasshopper
 
 Pi-hole
-- https://github.com/jacobsalmela/pi-hole
+- https://github.com/pi-hole/pi-hole
 
 SubSonic
 - NA

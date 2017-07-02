@@ -16,6 +16,9 @@
 	#Force en_GB Locale for whole script. Prevents incorrect parsing with non-english locales.
 	LANG=en_GB.UTF-8
 
+	#Ensure we are in users home dir: https://github.com/Fourdee/DietPi/issues/905#issuecomment-298223705
+	cd "$HOME"
+
 	#/////////////////////////////////////////////////////////////////////////////////////
 	#Globals
 	#/////////////////////////////////////////////////////////////////////////////////////
@@ -23,6 +26,7 @@
 
 	HW_MODEL=0
 	DISTRO=0
+	HW_CPUID=0
 
 	# -3 = first boot / -2 = partition / -1 = filesystem / 0 = run dietpi-software at login / 1 = completed
 	DIETPI_INSTALL_STAGE=$(cat /DietPi/dietpi/.install_stage)
@@ -31,6 +35,7 @@
 
 		HW_MODEL=$(sed -n 1p /DietPi/dietpi/.hw_model)
 		DISTRO=$(sed -n 3p /DietPi/dietpi/.hw_model)
+		HW_CPUID=$(sed -n 9p /DietPi/dietpi/.hw_model)
 
 	}
 
@@ -89,26 +94,51 @@
 
 	Partition_SD(){
 
-		cat << _EOF_ | fdisk /dev/mmcblk0
+		local rootfs_resize_limit=$(cat /DietPi/dietpi.txt | grep -m1 '^rootfs_resize_limit=' | sed 's/.*=//')
+
+		local target_dev=$(findmnt / -o source -n)
+
+		# - MMCBLK[0-9]p[0-9] scrape
+		if [[ "$target_dev" = *"mmcblk"* ]]; then
+
+			target_dev=$(findmnt / -o source -n | sed 's/p[0-9]$//')
+
+		# - Everything else scrape (eg: /dev/sda1)
+		else
+
+			target_dev=$(findmnt / -o source -n | sed 's/[0-9]$//')
+
+		fi
+
+		if (( $rootfs_resize_limit < 100 )); then
+
+			parted -s $target_dev unit % resizepart 2 $rootfs_resize_limit% || parted $target_dev unit % resizepart 2 Yes $rootfs_resize_limit%
+
+		else
+
+			cat << _EOF_ | fdisk $target_dev
 p
 d
 2
 n
 p
 2
-$(parted /dev/mmcblk0 -ms unit s p | grep ':ext4::;' | sed 's/:/ /g' | sed 's/s//g' | awk '{ print $2 }')
+$(parted $target_dev -ms unit s p | grep ':ext4::;' | sed 's/:/ /g' | sed 's/s//g' | awk '{ print $2 }')
 
 p
 w
 
 _EOF_
 
+		fi
+
 	}
 
 	Expand_SD(){
 
-		#Resize Filesystem to new partition size
-		resize2fs /dev/mmcblk0p2
+		#Resize RootFS to new partition size
+		local target_dev=$(findmnt / -o source -n)
+		resize2fs $target_dev
 
 	}
 
@@ -223,25 +253,48 @@ _EOF_
 	Wait_For_Valid_Network_Connection(){
 
 		#Attempt to wait for a valid network connection
-		local max_loops=10
+		local max_loops=1
+
+		#	Wait mode, max time
+		local boot_wait_for_network=$(cat /DietPi/dietpi.txt | grep -m1 '^boot_wait_for_network=' | sed 's/.*=//')
+		if (( $boot_wait_for_network == 1 )); then
+
+			max_loops=10
+
+		fi
+
 		local loop_count=0
 		while true
 		do
 
 			if (( $loop_count >= $max_loops )); then
-				echo -e "$(date) | Valid connection wait timed out." >> "$FP_LOGFILE"
+
+				/DietPi/dietpi/func/dietpi-notify 1 "$(date) | Valid connection wait timed out." | tee -a "$FP_LOGFILE"
 				break
+
 			elif (( ! $(route | awk '{print $4}' | grep -ci -m1 'UG') )); then
-				echo -e "$(date) | Waiting for valid connection." >> "$FP_LOGFILE"
+
+				/DietPi/dietpi/func/dietpi-notify 2 "$(date) | Waiting for valid connection, before continuing boot | Mode=$boot_wait_for_network" | tee -a "$FP_LOGFILE"
 				sleep 1
+
 			else
+
 				# - Update network details (for IP in dietpi-banner etc..)
-				echo -e "$(date) | Valid connection found." >> "$FP_LOGFILE"
+				/DietPi/dietpi/func/dietpi-notify 0 "$(date) | Valid connection found." | tee -a "$FP_LOGFILE"
 				/DietPi/dietpi/func/obtain_network_details
+
+				#	Mount all drives again (eg: network shares)
+				mount -a
+
 				break
+
 			fi
 
-			((loop_count++))
+			if (( $boot_wait_for_network != 2 )); then
+
+				((loop_count++))
+
+			fi
 
 		done
 
@@ -250,19 +303,16 @@ _EOF_
 	Run_Init(){
 
 		#----------------------------------------------------------------
-		#Update NTP (+thread)
-		local ntpd_update_mode=$(cat /DietPi/dietpi.txt | grep -m1 '^ntpd_update_mode=' | sed 's/.*=//')
-		if (( $ntpd_update_mode >= 1 && $ntpd_update_mode <= 3 )); then
-
-			#run, exit when updated.
-			ntpd -gq -l /var/log/ntpd.log &> /dev/null &
-
-		fi
+		#Update NTP
+		/DietPi/dietpi/func/run_ntpd &
 		#----------------------------------------------------------------
 		#Write HW model and details to file
 		/DietPi/dietpi/dietpi-obtain_hw_model
 		#Read Hw model
 		Read_Hw_Model
+		#----------------------------------------------------------------
+		#Apply LED triggers if set
+		/DietPi/dietpi/func/dietpi-led_control 1 &
 		#----------------------------------------------------------------
 		#Set CRDA Country code
 		local wifi_country_code=$(cat /DietPi/dietpi.txt | grep -m1 '^wifi_country_code=' | sed 's/.*=//')
@@ -279,7 +329,7 @@ _EOF_
 
 		fi
 		#----------------------------------------------------------------
-		#Apply DietPi CPU Governor and settings (+thread)
+		#Apply DietPi CPU Governor and settings
 		/DietPi/dietpi/dietpi-cpu_set &
 		#----------------------------------------------------------------
 		#Disable RPi hdmi output if set in dietpi.txt
@@ -289,6 +339,14 @@ _EOF_
 			#FBset value below allows for reduced memory bandwidth usage from VideoCore (eg: Faster RAM bandwidth/performance)
 			fbset -xres 16 -yres 16 -vxres 16 -vyres 16 -depth 8 &> /dev/null
 			/opt/vc/bin/tvservice -o &> /dev/null
+
+		fi
+		#----------------------------------------------------------------
+		#Always re-detect correct USB DAC card index during each boot
+		local soundcard_current=$(cat /DietPi/dietpi.txt | grep -m1 'soundcard=' | sed 's/.*=//')
+		if [ "$soundcard_current" = "usb-dac" ]; then
+
+			/DietPi/dietpi/func/dietpi-set_hardware soundcard usb-dac
 
 		fi
 		#----------------------------------------------------------------
@@ -305,22 +363,27 @@ _EOF_
 		# - Lower dmesg print level (mostly for Odroid C2 where HiFi Shield prints info when starting/stopping stream on tty1)
 		dmesg -n 1
 		#----------------------------------------------------------------
-		#Workaround: NanoPi NEO Air. Wlan currently fails to connect during boot, so, manually drop and reconnect: https://github.com/Fourdee/DietPi/issues/602#issuecomment-262806470
-		if (( $HW_MODEL == 64 )); then
+		Workaround_WiFi
+		#----------------------------------------------------------------
+
+	}
+
+	Workaround_WiFi(){
+
+		#Workaround: Wlan currently fails to connect during boot, so, manually drop and reconnect: https://github.com/Fourdee/DietPi/issues/602#issuecomment-262806470
+		#	OPi Zero 2 / Neo Air
+		if (( $HW_MODEL == 35 || $HW_MODEL == 64 )); then
 
 			ifdown wlan0
 			ifup wlan0
 
 		fi
-		#----------------------------------------------------------------
 
 	}
 
 	#/////////////////////////////////////////////////////////////////////////////////////
 	# Main Loop
 	#/////////////////////////////////////////////////////////////////////////////////////
-	#----------------------------------------------------------------
-	#Precaution: Wait for DietPi Ramdisk to finish. | Not required, dietpi-boot.service has a require for ramdisk success.
 
 	#----------------------------------------------------------------
 	# Init
@@ -410,6 +473,8 @@ _EOF_
 
 		#Activate DietPi Boot Loader User Settings and bring up network (dietpi.txt)
 		Apply_DietPi_FirstRun_Settings
+
+		Workaround_WiFi
 
 		#Finished
 		/DietPi/dietpi/dietpi-banner 0

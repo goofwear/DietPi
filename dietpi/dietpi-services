@@ -17,6 +17,9 @@
 	#Force en_GB Locale for whole script. Prevents incorrect parsing with non-english locales.
 	LANG=en_GB.UTF-8
 
+	#Ensure we are in users home dir: https://github.com/Fourdee/DietPi/issues/905#issuecomment-298223705
+	cd "$HOME"
+
 	INPUT_MODE="$1"
 
 	DISTRO=$(sed -n 3p /DietPi/dietpi/.hw_model)
@@ -40,6 +43,7 @@
 		'noip2'
 		'grasshopper'
 		'dnsmasq'
+		'pihole-FTL'
 		'subsonic'
 		'webiopi'
 		'haproxy'
@@ -51,7 +55,7 @@
 		'shairport-sync'
 		'squeezelite'
 		'mopidy'
-		'mariadb'
+		#'mariadb' #: https://github.com/Fourdee/DietPi/issues/1000#issuecomment-307760517
 		'redis-server'
 		'emonhub'
 		'netdata'
@@ -74,7 +78,40 @@
 		'tomcat8'
 		'rpimonitor'
 		'openmediavault-engined'
+		'blynkserver'
+		'aria2'
+		'yacy'
+		'tonido'
+		'icecast2'
+		'darkice'
+		'motioneye'
+		'cups'
+		'cloudprintd'
+		'virtualhere'
+		'sabnzbd'
+		'spotify-connect-web'
+		'couchpotato'
+		'koel'
+		'sonarr'
+		'radarr'
+		'plexpy'
+		'jackett'
+		'nzbget'
 	)
+
+	# - User: read custom services file
+	FP_INCLUDE_SERVICES='/DietPi/dietpi/.dietpi-services_include'
+	if [ -f "$FP_INCLUDE_SERVICES" ]; then
+
+		while read line
+		do
+
+			index=${#aSERVICE_NAME[@]}
+			aSERVICE_NAME[$index]="$line"
+
+		done < "$FP_INCLUDE_SERVICES"
+
+	fi
 
 	aSERVICE_AVAILABLE=0
 	for ((i=0; i<${#aSERVICE_NAME[@]}; i++))

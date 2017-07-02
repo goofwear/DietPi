@@ -12,8 +12,9 @@
 
 	LOGGING_MODE=0
 	if [ -f /DietPi/dietpi/.installed ]; then
-		. /DietPi/dietpi/.installed
-		LOGGING_MODE=$INDEX_LOGGING_CURRENT
+
+		LOGGING_MODE=$(cat /DietPi/dietpi/.installed | grep -m1 '^INDEX_LOGGING_CURRENT=' | sed 's/.*=//')
+
 	fi
 
 	NTPD_UPDATE_MODE=$(cat /DietPi/dietpi.txt | grep -m1 '^ntpd_update_mode=' | sed 's/.*=//')
@@ -23,8 +24,7 @@
 	#----------------------------------------------------------------
 	#Update NTP
 	if (( $NTPD_UPDATE_MODE == 3 )); then
-		killall -w ntpd &> /dev/null
-		ntpd -gq -l /var/log/ntpd.log &> /dev/null &
+		/DietPi/dietpi/func/run_ntpd &> /dev/null &
 	fi
 	#----------------------------------------------------------------
 	# Logging

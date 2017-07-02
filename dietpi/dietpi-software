@@ -26,12 +26,23 @@
 	#Force en_GB Locale for whole script. Prevents incorrect parsing with non-english locales.
 	LANG=en_GB.UTF-8
 
+	#Ensure we are in users home dir: https://github.com/Fourdee/DietPi/issues/905#issuecomment-298223705
+	cd "$HOME"
+
 	#Exit path for non-root logins.
 	if (( $UID != 0 )); then
-		clear
-		echo -e "\n ERROR: You do not have root privileges.\n Please login as root, or, use:\n sudo dietpi-software\n"
 
-		Exit_Destroy
+		/DietPi/dietpi/func/dietpi-notify 1 'Error: Root privileges required. Please run the command with "sudo"\n'
+		exit
+
+	fi
+
+	#RootFS RW check
+	/DietPi/dietpi/dietpi-drive_manager 3
+	if (( $? != 0 )); then
+
+		exit
+
 	fi
 
 	#/////////////////////////////////////////////////////////////////////////////////////
@@ -59,9 +70,11 @@
 
 	FP_DIETPIAUTOMATION_LOG="/root/DietPi-Automation.log"
 
-	#Used to set user/personal data directories (eg: usbdrive /mnt/usb_1)
+	FP_APT_LOG='/var/log/dietpi-software_apt.log'
+
+	#Used to set user/personal data directories (eg: usbdrive)
 	FP_DIETPI_USERDATA_DIRECTORY='/mnt/dietpi_userdata'
-	FP_DIETPI_DEDICATED_USBDRIVE='/mnt/usb_1'
+	FP_DIETPI_DEDICATED_USBDRIVE=''
 
 	#Uninstall temp file
 	UNINSTALL_FILE='/tmp/dietpi_uninstall_list'
@@ -155,6 +168,21 @@ _EOF_
 
 	}
 
+	Check_NTPD_Status(){
+
+		if (( $(route | awk '{print $4}' | grep -ci -m1 'UG') )); then
+
+			/DietPi/dietpi/func/run_ntpd status
+			if (( $? != 0 )); then
+
+				Error_NTPD_Failed
+
+			fi
+
+		fi
+
+	}
+
 	#/////////////////////////////////////////////////////////////////////////////////////
 	# Installation System
 	#/////////////////////////////////////////////////////////////////////////////////////
@@ -228,7 +256,7 @@ _EOF_
 	# - Software
 	#NB: All software has a unique index that must not be changed (eg: DESKTOP_LXDE = 23)
 	TOTAL_SOFTWARE_INDEXS=0
-	TOTAL_SOFTWARE_INDEXS_HARDLIMIT=127	#Increase as needed. Must be higher than TOTAL_SOFTWARE_INDEXS once calculated in Software_Arrays_Init
+	TOTAL_SOFTWARE_INDEXS_HARDLIMIT=150	#Increase as needed. Must be higher than TOTAL_SOFTWARE_INDEXS once calculated in Software_Arrays_Init
 
 	INSTALLING_INDEX=0					#Which software index is currently being installed?
 
@@ -241,7 +269,7 @@ _EOF_
 	aSOFTWARE_WHIP_DESC=0				#Blah blah
 
 	FP_ONLINEDOC_URL='http://dietpi.com/phpbb/viewtopic.php?'
-	aSOFTWARE_ONLINEDOC_URL=0			#eg
+	aSOFTWARE_ONLINEDOC_URL=0
 
 	# - Disable software installation, if user input is required for automated installs
 	aSOFTWARE_REQUIRES_USERINPUT=0
@@ -261,8 +289,8 @@ _EOF_
 	aSOFTWARE_REQUIRES_NODEJS=0
 
 	# - Available for
-	MAX_HW_MODEL=70		#This needs to match highest HW_MODEL value in dietpi-obtain_hw_model
-	MAX_HW_ARCH=21		#This needs to match highest HW_ARCH value in dietpi-obtain_hw_model
+	MAX_HW_MODEL=110	#This needs to match highest HW_MODEL value in dietpi-obtain_hw_model
+	MAX_HW_ARCH=10		#This needs to match highest HW_ARCH value in dietpi-obtain_hw_model
 	#	2D array (well, bash style)
 	declare -A aSOFTWARE_AVAIL_HW_MODEL
 	declare -A aSOFTWARE_AVAIL_HW_ARCH
@@ -279,10 +307,10 @@ _EOF_
 			"────Desktops──────────────────────────────────────────────" #0
 			"────Remote Desktop Access─────────────────────────────────" #1
 			"────Media Systems─────────────────────────────────────────" #2
-			"────BitTorrent────────────────────────────────────────────" #3
+			"────BitTorrent / Download Tools───────────────────────────" #3
 			"────Cloud / Backups───────────────────────────────────────" #4
 			"────Emulation & Gaming────────────────────────────────────" #5
-			"────Social Media──────────────────────────────────────────" #6
+			"────Social / Search───────────────────────────────────────" #6
 			"────Camera / Surveillance─────────────────────────────────" #7
 			"────WiFi Hotspot──────────────────────────────────────────" #8
 			"────System Stats / Management─────────────────────────────" #9
@@ -300,7 +328,7 @@ _EOF_
 
 		MAX_SOFTWARE_CATEGORIES_DIETPI=${#aSOFTWARE_CATEGORIES_DIETPI[@]}
 
-		#DietPi software
+		#Linux software
 		aSOFTWARE_CATEGORIES_LINUX=(
 
 			"────SSH Clients───────────────────────────────────────────" #0
@@ -447,7 +475,7 @@ _EOF_
 			 aSOFTWARE_ONLINEDOC_URL[$index_current]='http://dietpi.com/phpbb/viewtopic.php?f=8&t=5&p=3011#p3011'
 
 		# - Disabled for HW_ARCH
-		aSOFTWARE_AVAIL_HW_ARCH[$index_current,21]=0
+		aSOFTWARE_AVAIL_HW_ARCH[$index_current,10]=0
 		aSOFTWARE_AVAIL_HW_ARCH[$index_current,1]=0
 
 
@@ -539,28 +567,28 @@ _EOF_
 		#------------------
 		index_current=32
 
-				 aSOFTWARE_WHIP_NAME[$index_current]='HiFi'
-				 aSOFTWARE_WHIP_DESC[$index_current]='web interface music & radio player'
+				 aSOFTWARE_WHIP_NAME[$index_current]='YMPD'
+				 aSOFTWARE_WHIP_DESC[$index_current]='lightweight web interface music player for mpd'
 			aSOFTWARE_CATEGORY_INDEX[$index_current]=2
 					  aSOFTWARE_TYPE[$index_current]=0
 			 aSOFTWARE_REQUIRES_ALSA[$index_current]=1
 			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5#p50'
 
 		# - Disabled for HW_ARCH
-		aSOFTWARE_AVAIL_HW_ARCH[$index_current,21]=0
+		aSOFTWARE_AVAIL_HW_ARCH[$index_current,10]=0
 
 		#------------------
 		index_current=119
 
 				 aSOFTWARE_WHIP_NAME[$index_current]='CAVA'
-				 aSOFTWARE_WHIP_DESC[$index_current]='optional: console audio vis for HiFi (mpd)'
+				 aSOFTWARE_WHIP_DESC[$index_current]='optional: console audio vis for mpd'
 			aSOFTWARE_CATEGORY_INDEX[$index_current]=2
 					  aSOFTWARE_TYPE[$index_current]=0
 			 aSOFTWARE_REQUIRES_ALSA[$index_current]=1
 			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=3928#p3928'
 
 		# - Disabled for HW_ARCH
-		aSOFTWARE_AVAIL_HW_ARCH[$index_current,21]=0
+		aSOFTWARE_AVAIL_HW_ARCH[$index_current,10]=0
 
 		#------------------
 		index_current=33
@@ -618,7 +646,7 @@ _EOF_
 			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=1221#p1221'
 
 		# - Disabled for HW_ARCH
-		aSOFTWARE_AVAIL_HW_ARCH[$index_current,21]=0
+		aSOFTWARE_AVAIL_HW_ARCH[$index_current,10]=0
 
 		#------------------
 		index_current=38
@@ -641,8 +669,8 @@ _EOF_
 		#------------------
 		index_current=39
 
-				 aSOFTWARE_WHIP_NAME[$index_current]='MiniDLNA'
-				 aSOFTWARE_WHIP_DESC[$index_current]='media streaming server (dlna, upnp)'
+				 aSOFTWARE_WHIP_NAME[$index_current]='ReadyMedia'
+				 aSOFTWARE_WHIP_DESC[$index_current]='(MiniDLNA) media streaming server (dlna, upnp)'
 			aSOFTWARE_CATEGORY_INDEX[$index_current]=2
 					  aSOFTWARE_TYPE[$index_current]=0
 			 aSOFTWARE_REQUIRES_ALSA[$index_current]=1
@@ -719,7 +747,7 @@ _EOF_
 			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&start=80#p4153'
 			 aSOFTWARE_REQUIRES_ALSA[$index_current]=1
 
-		# - Currently ARMv7+ only, so disable all archs
+		# - Currently ARMv7/64 only, so disable all archs
 		for ((i=0; i<=$MAX_HW_ARCH; i++))
 		do
 
@@ -727,8 +755,8 @@ _EOF_
 
 		done
 
-		#	renable for armv7+
-		for ((i=2; i<10; i++))
+		#	renable for armv7/64
+		for ((i=2; i<=10; i++))
 		do
 
 			aSOFTWARE_AVAIL_HW_ARCH[$index_current,$i]=1
@@ -754,10 +782,114 @@ _EOF_
 		done
 
 		#	renable for armv7+
-		for ((i=2; i<10; i++))
+		aSOFTWARE_AVAIL_HW_ARCH[$index_current,2]=1
+
+		#------------------
+		index_current=128
+
+				 aSOFTWARE_WHIP_NAME[$index_current]='MPD'
+				 aSOFTWARE_WHIP_DESC[$index_current]='music player daemon'
+			aSOFTWARE_CATEGORY_INDEX[$index_current]=2
+					  aSOFTWARE_TYPE[$index_current]=0
+			 aSOFTWARE_REQUIRES_ALSA[$index_current]=1
+			 aSOFTWARE_ONLINEDOC_URL[$index_current]='xxxxxxxxx'
+
+		# - Disabled for HW_ARCH
+		aSOFTWARE_AVAIL_HW_ARCH[$index_current,10]=0
+
+		#------------------
+		index_current=129
+
+				 aSOFTWARE_WHIP_NAME[$index_current]='O!MPD'
+				 aSOFTWARE_WHIP_DESC[$index_current]='feature-rich, web interface audio player for mpd'
+			aSOFTWARE_CATEGORY_INDEX[$index_current]=2
+					  aSOFTWARE_TYPE[$index_current]=0
+			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=5171#p5171'
+			 aSOFTWARE_REQUIRES_ALSA[$index_current]=1
+		aSOFTWARE_REQUIRES_WEBSERVER[$index_current]=1
+ 			aSOFTWARE_REQUIRES_MYSQL[$index_current]=1
+
+		# - Disabled for VM
+		aSOFTWARE_AVAIL_HW_ARCH[$index_current,10]=0
+
+		#------------------
+		index_current=135
+
+				 aSOFTWARE_WHIP_NAME[$index_current]='IceCast'
+				 aSOFTWARE_WHIP_DESC[$index_current]='Shoutcast streaming server (+DarkIce)'
+			aSOFTWARE_CATEGORY_INDEX[$index_current]=2
+					  aSOFTWARE_TYPE[$index_current]=0
+			 aSOFTWARE_REQUIRES_ALSA[$index_current]=1
+			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=6526#p6526'
+
+		# - Disabled for VM
+		aSOFTWARE_AVAIL_HW_ARCH[$index_current,10]=0
+
+		#------------------
+		index_current=141
+
+				 aSOFTWARE_WHIP_NAME[$index_current]='Spotify Connect Web'
+				 aSOFTWARE_WHIP_DESC[$index_current]='web interface for spotify premium'
+			aSOFTWARE_CATEGORY_INDEX[$index_current]=2
+					  aSOFTWARE_TYPE[$index_current]=0
+			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=7013#p7013'
+			 aSOFTWARE_REQUIRES_ALSA[$index_current]=1
+
+		# - Currently ARMv7+ only, so disable all archs
+		for ((i=0; i<=$MAX_HW_ARCH; i++))
 		do
 
-			aSOFTWARE_AVAIL_HW_ARCH[$index_current,$i]=1
+			aSOFTWARE_AVAIL_HW_ARCH[$index_current,$i]=0
+
+		done
+
+		#	renable for armv7+
+		aSOFTWARE_AVAIL_HW_ARCH[$index_current,2]=1
+
+		#------------------
+		index_current=143
+
+				 aSOFTWARE_WHIP_NAME[$index_current]='Koel'
+				 aSOFTWARE_WHIP_DESC[$index_current]='web interface audio streamer'
+			aSOFTWARE_CATEGORY_INDEX[$index_current]=2
+					  aSOFTWARE_TYPE[$index_current]=0
+			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=7305#p7305'
+		aSOFTWARE_REQUIRES_WEBSERVER[$index_current]=1
+ 			aSOFTWARE_REQUIRES_MYSQL[$index_current]=1
+		   aSOFTWARE_REQUIRES_NODEJS[$index_current]=1
+   aSOFTWARE_REQUIRES_BUILDESSENTIAL[$index_current]=1
+		   aSOFTWARE_REQUIRES_FFMPEG[$index_current]=1
+
+		#------------------
+		index_current=146
+
+				 aSOFTWARE_WHIP_NAME[$index_current]='PlexPy'
+				 aSOFTWARE_WHIP_DESC[$index_current]='monitoring and tracking tool for Plex'
+			aSOFTWARE_CATEGORY_INDEX[$index_current]=2
+					  aSOFTWARE_TYPE[$index_current]=0
+			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=7463#p7463'
+ 			  aSOFTWARE_REQUIRES_GIT[$index_current]=1
+
+		# - Disabled for ARM64
+		aSOFTWARE_AVAIL_HW_ARCH[$index_current,3]=0
+
+
+		#------------------
+		index_current=148
+
+				 aSOFTWARE_WHIP_NAME[$index_current]='JRiver MC'
+				 aSOFTWARE_WHIP_DESC[$index_current]='media centre'
+			aSOFTWARE_CATEGORY_INDEX[$index_current]=2
+					  aSOFTWARE_TYPE[$index_current]=0
+			 aSOFTWARE_REQUIRES_ALSA[$index_current]=1
+	  aSOFTWARE_REQUIRES_XSERVERXORG[$index_current]=1
+			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&start=110#p7536'
+
+		# - Disabled for All non-rpi
+		for ((i=10; i<=$MAX_HW_MODEL; i++))
+		do
+
+			aSOFTWARE_AVAIL_HW_MODEL[$index_current,$i]=0
 
 		done
 
@@ -810,6 +942,74 @@ _EOF_
 					  aSOFTWARE_TYPE[$index_current]=0
 			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=3327#p3327'
 
+
+		#------------------
+		index_current=132
+
+				 aSOFTWARE_WHIP_NAME[$index_current]='Aria2'
+				 aSOFTWARE_WHIP_DESC[$index_current]='download manager with web interface'
+			aSOFTWARE_CATEGORY_INDEX[$index_current]=3
+					  aSOFTWARE_TYPE[$index_current]=0
+			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=6177#p6177'
+		aSOFTWARE_REQUIRES_WEBSERVER[$index_current]=1
+		   aSOFTWARE_REQUIRES_SQLITE[$index_current]=1
+
+		#------------------
+		index_current=139
+
+				 aSOFTWARE_WHIP_NAME[$index_current]='SABnzbd'
+				 aSOFTWARE_WHIP_DESC[$index_current]='nzb download manager'
+			aSOFTWARE_CATEGORY_INDEX[$index_current]=3
+					  aSOFTWARE_TYPE[$index_current]=0
+			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=6747#p6747'
+   aSOFTWARE_REQUIRES_BUILDESSENTIAL[$index_current]=1
+
+		#------------------
+		index_current=142
+
+				 aSOFTWARE_WHIP_NAME[$index_current]='CouchPotato'
+				 aSOFTWARE_WHIP_DESC[$index_current]='automatically download movies'
+			aSOFTWARE_CATEGORY_INDEX[$index_current]=3
+					  aSOFTWARE_TYPE[$index_current]=0
+			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=6747#p6747'
+   aSOFTWARE_REQUIRES_BUILDESSENTIAL[$index_current]=1
+			  aSOFTWARE_REQUIRES_GIT[$index_current]=1
+
+		#------------------
+		index_current=144
+
+				 aSOFTWARE_WHIP_NAME[$index_current]='Sonarr'
+				 aSOFTWARE_WHIP_DESC[$index_current]='automatically download TV shows'
+			aSOFTWARE_CATEGORY_INDEX[$index_current]=3
+					  aSOFTWARE_TYPE[$index_current]=0
+			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=7455#p7455'
+
+		#------------------
+		index_current=145
+
+				 aSOFTWARE_WHIP_NAME[$index_current]='Radarr'
+				 aSOFTWARE_WHIP_DESC[$index_current]='automatically download movies'
+			aSOFTWARE_CATEGORY_INDEX[$index_current]=3
+					  aSOFTWARE_TYPE[$index_current]=0
+			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=7457#p7457'
+
+		#------------------
+		index_current=147
+
+				 aSOFTWARE_WHIP_NAME[$index_current]='Jackett'
+				 aSOFTWARE_WHIP_DESC[$index_current]='api Support for your torrent trackers.'
+			aSOFTWARE_CATEGORY_INDEX[$index_current]=3
+					  aSOFTWARE_TYPE[$index_current]=0
+			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=7503#p7503'
+
+		#------------------
+		index_current=149
+
+				 aSOFTWARE_WHIP_NAME[$index_current]='NZBget'
+				 aSOFTWARE_WHIP_DESC[$index_current]='nzb download manager'
+			aSOFTWARE_CATEGORY_INDEX[$index_current]=3
+					  aSOFTWARE_TYPE[$index_current]=0
+			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=7575#p7575'
 
 		#Cloud / Backups
 		#--------------------------------------------------------------------------------
@@ -881,12 +1081,43 @@ _EOF_
 			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&start=70#p2363'
 
 		#------------------
+		index_current=134
+
+				 aSOFTWARE_WHIP_NAME[$index_current]='Tonido'
+				 aSOFTWARE_WHIP_DESC[$index_current]='lightweight cloud based backup system'
+			aSOFTWARE_CATEGORY_INDEX[$index_current]=4
+					  aSOFTWARE_TYPE[$index_current]=0
+			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=6476#p6476'
+
+		# - Disabled for armv6
+		aSOFTWARE_AVAIL_HW_ARCH[$index_current,1]=0
+
+		# - Disabled for arm64
+		aSOFTWARE_AVAIL_HW_ARCH[$index_current,10]=0
+
+		#------------------
+		index_current=137
+
+				 aSOFTWARE_WHIP_NAME[$index_current]='CloudPrint'
+				 aSOFTWARE_WHIP_DESC[$index_current]='print server for google cloud print'
+			aSOFTWARE_CATEGORY_INDEX[$index_current]=4
+					  aSOFTWARE_TYPE[$index_current]=0
+			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=6630#p6630'
+ 		  aSOFTWARE_REQUIRES_RSYSLOG[$index_current]=1 #Not required, but comes in as package dep
+
+		#Disabled for ARM64 on Jessie only: https://github.com/Fourdee/DietPi/issues/855#issuecomment-292712002
+		if (( $DISTRO == 3 )); then
+
+			aSOFTWARE_AVAIL_HW_ARCH[$index_current,10]=0
+
+		fi
+		#------------------
 
 		#Emulation / Gaming
 		#--------------------------------------------------------------------------------
 		index_current=108
 
-				 aSOFTWARE_WHIP_NAME[$index_current]='AmiBerry (Uae4ARM)'
+				 aSOFTWARE_WHIP_NAME[$index_current]='AmiBerry'
 				 aSOFTWARE_WHIP_DESC[$index_current]='amiga emulator'
 			aSOFTWARE_CATEGORY_INDEX[$index_current]=5
 					  aSOFTWARE_TYPE[$index_current]=0
@@ -1022,6 +1253,16 @@ _EOF_
 			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=1796#p1796'
 
 		#------------------
+		index_current=133
+
+				 aSOFTWARE_WHIP_NAME[$index_current]='YaCy'
+				 aSOFTWARE_WHIP_DESC[$index_current]='decentralized open source search engine'
+			aSOFTWARE_CATEGORY_INDEX[$index_current]=6
+					  aSOFTWARE_TYPE[$index_current]=0
+	   aSOFTWARE_REQUIRES_ORACLEJAVA[$index_current]=1
+			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=6202#p6202'
+
+		#------------------
 
 		#Camera
 		#--------------------------------------------------------------------------------
@@ -1033,6 +1274,24 @@ _EOF_
 					  aSOFTWARE_TYPE[$index_current]=0
 		aSOFTWARE_REQUIRES_WEBSERVER[$index_current]=1
 			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5#p48'
+
+		# - Disabled for All non-rpi
+		for ((i=10; i<=$MAX_HW_MODEL; i++))
+		do
+
+			aSOFTWARE_AVAIL_HW_MODEL[$index_current,$i]=0
+
+		done
+
+		#------------------
+		index_current=136
+
+				 aSOFTWARE_WHIP_NAME[$index_current]='MotionEye'
+				 aSOFTWARE_WHIP_DESC[$index_current]='web interface & surveillance for your camera'
+			aSOFTWARE_CATEGORY_INDEX[$index_current]=7
+					  aSOFTWARE_TYPE[$index_current]=0
+			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=6610#p6610'
+ 		   aSOFTWARE_REQUIRES_FFMPEG[$index_current]=1
 
 		# - Disabled for All non-rpi
 		for ((i=10; i<=$MAX_HW_MODEL; i++))
@@ -1055,7 +1314,7 @@ _EOF_
 			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=1207#p1207'
 
 		# - Disabled for HW_ARCH
-		aSOFTWARE_AVAIL_HW_ARCH[$index_current,21]=0
+		aSOFTWARE_AVAIL_HW_ARCH[$index_current,10]=0
 
 		#------------------
 		index_current=61
@@ -1067,7 +1326,7 @@ _EOF_
 			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=1529#p1529'
 
 		# - Disabled for HW_ARCH
-		aSOFTWARE_AVAIL_HW_ARCH[$index_current,21]=0
+		aSOFTWARE_AVAIL_HW_ARCH[$index_current,10]=0
 
 		#------------------
 
@@ -1104,15 +1363,12 @@ _EOF_
 		#------------------
 		index_current=65
 
-				 aSOFTWARE_WHIP_NAME[$index_current]='Netdata'
+				 aSOFTWARE_WHIP_NAME[$index_current]='NetData'
 				 aSOFTWARE_WHIP_DESC[$index_current]='real-time performance monitoring'
 			aSOFTWARE_CATEGORY_INDEX[$index_current]=9
 					  aSOFTWARE_TYPE[$index_current]=0
 		   aSOFTWARE_REQUIRES_NODEJS[$index_current]=1
 			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&start=60#p1611'
-
-		# - Disabled for HW_ARCH
-		aSOFTWARE_AVAIL_HW_ARCH[$index_current,21]=0
 
 		#------------------
 		index_current=66
@@ -1167,7 +1423,7 @@ _EOF_
 				 aSOFTWARE_WHIP_NAME[$index_current]='OpenMediaVault'
 				 aSOFTWARE_WHIP_DESC[$index_current]='nas solution with web interface'
 			aSOFTWARE_CATEGORY_INDEX[$index_current]=9
-					  aSOFTWARE_TYPE[$index_current]=0
+					  aSOFTWARE_TYPE[$index_current]=-1 #:https://github.com/Fourdee/DietPi/issues/851
 			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=4859#p4859'
 		aSOFTWARE_REQUIRES_WEBSERVER[$index_current]=1
 		aSOFTWARE_REQUIRES_USERINPUT[$index_current]=1
@@ -1187,11 +1443,32 @@ _EOF_
 		#------------------
 		index_current=68
 
-				 aSOFTWARE_WHIP_NAME[$index_current]='Weaved'
-				 aSOFTWARE_WHIP_DESC[$index_current]='access your device over the internet'
+				 aSOFTWARE_WHIP_NAME[$index_current]='Remot3.it'
+				 aSOFTWARE_WHIP_DESC[$index_current]='(Weaved) access your device over the internet'
 			aSOFTWARE_CATEGORY_INDEX[$index_current]=10
 					  aSOFTWARE_TYPE[$index_current]=0
 			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&start=20#p188'
+
+		# - Currently ARMv7+ only, so disable all archs
+		for ((i=0; i<=$MAX_HW_ARCH; i++))
+		do
+
+			aSOFTWARE_AVAIL_HW_ARCH[$index_current,$i]=0
+
+		done
+
+		#	renable for armv6/7
+		aSOFTWARE_AVAIL_HW_ARCH[$index_current,1]=1
+		aSOFTWARE_AVAIL_HW_ARCH[$index_current,2]=1
+
+		#------------------
+		index_current=138
+
+				 aSOFTWARE_WHIP_NAME[$index_current]='VirtualHere'
+				 aSOFTWARE_WHIP_DESC[$index_current]='server: share USB devices over the network'
+			aSOFTWARE_CATEGORY_INDEX[$index_current]=10
+					  aSOFTWARE_TYPE[$index_current]=0
+			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=6709#p6709'
 
 		#------------------
 
@@ -1223,13 +1500,16 @@ _EOF_
    aSOFTWARE_REQUIRES_BUILDESSENTIAL[$index_current]=1
 			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=1066#p1066'
 
-		# - RPi / Odroids only
+		# - RPi / Odroids
 		for ((i=20; i<=$MAX_HW_MODEL; i++))
 		do
 
 			aSOFTWARE_AVAIL_HW_MODEL[$index_current,$i]=0
 
 		done
+
+		#+ BPi Pro
+		aSOFTWARE_AVAIL_HW_MODEL[$index_current,51]=1
 
 		#------------------
 		index_current=71
@@ -1278,7 +1558,7 @@ _EOF_
 
 		# - Disabled for HW_ARCH
 		aSOFTWARE_AVAIL_HW_ARCH[$index_current,10]=0
-		aSOFTWARE_AVAIL_HW_ARCH[$index_current,21]=0
+		aSOFTWARE_AVAIL_HW_ARCH[$index_current,10]=0
 
 		#------------------
 		index_current=123
@@ -1290,6 +1570,16 @@ _EOF_
 			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&start=90#p4293'
 
 		#------------------
+		index_current=131
+
+				 aSOFTWARE_WHIP_NAME[$index_current]='Blynk Server'
+				 aSOFTWARE_WHIP_DESC[$index_current]='msg controller for blynk mobile app and sbcs'
+			aSOFTWARE_CATEGORY_INDEX[$index_current]=11
+					  aSOFTWARE_TYPE[$index_current]=0
+			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&p=5901#p5901'
+	   aSOFTWARE_REQUIRES_ORACLEJAVA[$index_current]=1
+		   aSOFTWARE_REQUIRES_NODEJS[$index_current]=1
+   aSOFTWARE_REQUIRES_BUILDESSENTIAL[$index_current]=1
 
 		#System security
 		#--------------------------------------------------------------------------------
@@ -1717,6 +2007,28 @@ _EOF_
 			aSOFTWARE_CATEGORY_INDEX[$index_current]=4
 					  aSOFTWARE_TYPE[$index_current]=1
 		#------------------
+		index_current=130
+
+				 aSOFTWARE_WHIP_NAME[$index_current]='Python Pip'
+				 aSOFTWARE_WHIP_DESC[$index_current]='python pip package installer'
+			aSOFTWARE_CATEGORY_INDEX[$index_current]=4
+					  aSOFTWARE_TYPE[$index_current]=1
+		#------------------
+		index_current=140
+
+				 aSOFTWARE_WHIP_NAME[$index_current]='SDL2'
+				 aSOFTWARE_WHIP_DESC[$index_current]='simple direct layer 2'
+			aSOFTWARE_CATEGORY_INDEX[$index_current]=4
+					  aSOFTWARE_TYPE[$index_current]=1
+
+		# - Disabled for All non-rpi
+		for ((i=10; i<=$MAX_HW_MODEL; i++))
+		do
+
+			aSOFTWARE_AVAIL_HW_MODEL[$index_current,$i]=0
+
+		done
+		#------------------
 
 		#Network tools
 		#--------------------------------------------------------------------------------
@@ -1810,6 +2122,21 @@ _EOF_
 			aSOFTWARE_CATEGORY_INDEX[$index_current]=7
 					  aSOFTWARE_TYPE[$index_current]=1
 		#------------------
+		index_current=127
+
+				 aSOFTWARE_WHIP_NAME[$index_current]='NeoVim'
+				 aSOFTWARE_WHIP_DESC[$index_current]='heavily refactored vim fork'
+			aSOFTWARE_CATEGORY_INDEX[$index_current]=7
+					  aSOFTWARE_TYPE[$index_current]=1
+
+		# - Stretch only
+		if (( $DISTRO < 4 )); then
+
+			aSOFTWARE_AVAIL_HW_MODEL[$index_current,$HW_MODEL]=0
+
+		fi
+
+		#------------------
 
 		#Desktop Utilities
 		#--------------------------------------------------------------------------------
@@ -1860,7 +2187,7 @@ _EOF_
 				 aSOFTWARE_WHIP_DESC[$index_current]='ssh server'
 			aSOFTWARE_CATEGORY_INDEX[$index_current]=0
 					  aSOFTWARE_TYPE[$index_current]=-1
-			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&start=20#p68'
+			 aSOFTWARE_ONLINEDOC_URL[$index_current]='f=8&t=5&start=10#p62'
 		#------------------
 		index_current=105
 
@@ -2192,6 +2519,31 @@ _EOF_
 
 		fi
 
+		#Prevent incompatible MySQL + MariaDB installation: https://github.com/Fourdee/DietPi/issues/761#issuecomment-280848758
+		if (( ${aSOFTWARE_INSTALL_STATE[86]} >= 1 && ${aSOFTWARE_INSTALL_STATE[88]} >= 1 )); then
+
+			#	MySQL installed
+			if (( ${aSOFTWARE_INSTALL_STATE[86]} == 2 )); then
+
+				aSOFTWARE_INSTALL_STATE[88]=0
+				/DietPi/dietpi/func/dietpi-notify 2 "MySQL is already installed, MariaDB install has been disabled"
+
+			#	MariaDB installed
+			elif (( ${aSOFTWARE_INSTALL_STATE[88]} == 2 )); then
+
+				aSOFTWARE_INSTALL_STATE[86]=0
+				/DietPi/dietpi/func/dietpi-notify 2 "MariaDB is already installed, MySQL install has been disabled"
+
+			#	Both selected for install, disable Maria
+			else
+
+				aSOFTWARE_INSTALL_STATE[88]=0
+				/DietPi/dietpi/func/dietpi-notify 2 "MySQL and MariaDB are selected for install. MariaDB has been de-selected to prevent incompatible MySQL + MariaDB installation"
+
+			fi
+
+		fi
+
 		#DESKTOP
 		for ((i=0; i<$TOTAL_SOFTWARE_INDEXS; i++))
 		do
@@ -2363,14 +2715,53 @@ _EOF_
 		#------------
 		#Specials
 
-		#CAVA (requires MPD)
-		if (( ${aSOFTWARE_INSTALL_STATE[119]} == 1 &&
-			${aSOFTWARE_INSTALL_STATE[32]} == 0 )); then
+		#Software that requires SDL2:
+		if (( ${aSOFTWARE_INSTALL_STATE[108]} == 1 )); then
 
-			# - Flag for install
-			aSOFTWARE_INSTALL_STATE[32]=1
+			if (( ${aSOFTWARE_INSTALL_STATE[140]} == 0 )); then
 
-			/DietPi/dietpi/func/dietpi-notify 2 "HiFi will be installed"
+				aSOFTWARE_INSTALL_STATE[140]=1
+
+				/DietPi/dietpi/func/dietpi-notify 2 "SDL2 will be installed"
+
+			fi
+
+		fi
+
+		#Software that requires Python-Pip: https://github.com/Fourdee/DietPi/issues/784
+		if (( ${aSOFTWARE_INSTALL_STATE[58]} == 1 ||
+			${aSOFTWARE_INSTALL_STATE[99]} == 1 ||
+			${aSOFTWARE_INSTALL_STATE[118]} == 1 ||
+			${aSOFTWARE_INSTALL_STATE[136]} == 1 ||
+			${aSOFTWARE_INSTALL_STATE[139]} == 1 ||
+			${aSOFTWARE_INSTALL_STATE[142]} == 1 )); then
+
+			if (( ${aSOFTWARE_INSTALL_STATE[130]} == 0 )); then
+
+				aSOFTWARE_INSTALL_STATE[130]=1
+
+				/DietPi/dietpi/func/dietpi-notify 2 "Python-Pip will be installed"
+
+			fi
+
+		fi
+
+		#Software that requires MPD
+		#	HiFi
+		#	Cava
+		#	OMPD
+		if (( ${aSOFTWARE_INSTALL_STATE[32]} == 1 ||
+			${aSOFTWARE_INSTALL_STATE[119]} == 1 ||
+			${aSOFTWARE_INSTALL_STATE[129]} == 1 )); then
+
+			if (( ${aSOFTWARE_INSTALL_STATE[128]} == 0 )); then
+
+				# - Flag for install
+				aSOFTWARE_INSTALL_STATE[128]=1
+
+				/DietPi/dietpi/func/dietpi-notify 2 "MPD will be installed"
+
+			fi
 
 		fi
 
@@ -2413,7 +2804,6 @@ _EOF_
 		wget http://dietpi.com/downloads/conf/desktop/dietpi-software.desktop -O /usr/share/applications/dietpi-software.desktop
 		wget http://dietpi.com/downloads/conf/desktop/dietpi-update.desktop -O /usr/share/applications/dietpi-update.desktop
 		wget http://dietpi.com/downloads/conf/desktop/dietpi-config.desktop -O /usr/share/applications/dietpi-config.desktop
-		wget http://dietpi.com/downloads/conf/desktop/dietpi-uninstall.desktop -O /usr/share/applications/dietpi-uninstall.desktop
 		wget http://dietpi.com/downloads/conf/desktop/dietpi-backup.desktop -O /usr/share/applications/dietpi-backup.desktop
 		wget http://dietpi.com/downloads/conf/desktop/dietpi-sync.desktop -O /usr/share/applications/dietpi-sync.desktop
 		wget http://dietpi.com/downloads/conf/desktop/dietpi-bugreport.desktop -O /usr/share/applications/dietpi-bugreport.desktop
@@ -2475,15 +2865,17 @@ _EOF_
 
 		local force_options='--force-yes'
 
-		# if (( $DISTRO == 4 )): then
-			# force_options='--allow'
-		# fi
+		if (( $DISTRO >= 4 )); then
+
+			force_options='--allow-downgrades --allow-remove-essential --allow-change-held-packages'
+
+		fi
 
 		#-qq can add a slight period of appearing nothing is happening, lets inform user
 		/DietPi/dietpi/func/dietpi-notify 2 "Apt-get is processing, please wait...\n"
-		DEBIAN_FRONTEND=noninteractive $APT_BINARY install -y -qq $force_options $string
+		DEBIAN_FRONTEND=noninteractive $APT_BINARY install -y -qq $force_options $string 2>&1 | tee "$FP_APT_LOG"
 
-		local result=$?
+		local result=${PIPESTATUS[0]}
 		if (( $result != 0 )); then
 
 			Error_AptGet_Failed
@@ -2503,9 +2895,9 @@ _EOF_
 	#apt-get install -f
 	AGF(){
 
-		DEBIAN_FRONTEND=noninteractive $APT_BINARY install -f -y --force-yes
+		DEBIAN_FRONTEND=noninteractive $APT_BINARY install -f -y --force-yes 2>&1 | tee "$FP_APT_LOG"
 
-		local result=$?
+		local result=${PIPESTATUS[0]}
 		if (( $result != 0 )); then
 
 			Error_AptGet_Failed
@@ -2521,7 +2913,7 @@ _EOF_
 
 		local gigabit_device=1
 		# - Lets hope the next RPi device is finally gigabit capable. I'll cry if it is not.
-		if (( $HW_MODEL <= 3 || $HW_MODEL == 30 || $HW_MODEL == 32 || $HW_MODEL == 40 || $HW_MODEL == 60 || $HW_MODEL == 70)); then
+		if (( $HW_MODEL <= 3 || $HW_MODEL == 30 || $HW_MODEL == 32 || $HW_MODEL == 40 || $HW_MODEL == 60 || $HW_MODEL == 70 )); then
 
 			gigabit_device=0
 
@@ -2721,14 +3113,20 @@ _EOF_
 			INSTALL_DESCRIPTION="NoMachine (Secure RDP Server & Client)"
 
 			#x86_64
-			if (( $HW_ARCH == 21 )); then
+			if (( $HW_ARCH == 10 )); then
+
 				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/nomachine_5.1.44_1_amd64.deb'
+
 			#arm6 (RPi1)
 			elif (( $HW_ARCH == 1 )); then
+
 				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/nomachine_5.1.44_3_armv6hf.deb'
+
 			#arm7+ (RPi 2/3)
-			elif (( $HW_ARCH >= 2 && $HW_ARCH < 10 )); then
-				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/nomachine_5.1.44_1_armhf.deb'
+			elif (( $HW_ARCH == 2 )); then
+
+				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/nomachine_5.1.44_armhf.deb'
+
 			fi
 
 			# Now, check that the links are legitimate
@@ -2976,6 +3374,68 @@ _EOF_
 
 		fi
 
+		#MPD
+		INSTALLING_INDEX=128
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Banner_Installing
+
+			INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/mpd_0.19.21_'
+
+			# - armv6
+			if (( $HW_ARCH == 1 )); then
+
+				INSTALL_URL_ADDRESS+='armv6.deb'
+
+			# - armv7+
+			elif (( $HW_ARCH == 2 )); then
+
+				INSTALL_URL_ADDRESS+='armv7.deb'
+
+			# - arm64
+			elif (( $HW_ARCH == 3 )); then
+
+				INSTALL_URL_ADDRESS+='arm64.deb'
+
+			fi
+			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
+
+			#	Install
+			if (( $? == 0 )); then
+
+				#libupnp6 + Avahi-Daemon for net discov with upnp
+				AGI avahi-daemon libupnp6
+
+				# - ARM64 not available in Jessie repos
+				if (( $DISTRO == 3 &&
+					$HW_ARCH == 3 )); then
+
+					AGI libmpdclient2 libao-common libao4 libasound2 libasound2-data libasyncns0 libaudiofile1 libavahi-client3 libavahi-common-data libavahi-common3 libavcodec56 libavformat56 libavresample2 libavutil54 libbinio1ldbl libcaca0 libcdio-cdda1 libcdio-paranoia1 libcdio13 libcups2 libcurl3-gnutls libdirectfb-1.2-9 libdnet libfaad2 libflac8 libfluidsynth1 libgme0 libgomp1 libgsm1 libice6 libid3tag0 libiso9660-8 libjack-jackd2-0 libjson-c2 libldb1 libmad0 libmikmod3 libmms0 libmodplug1 libmp3lame0 libmpcdec6 libmpg123-0 libnfs4 libntdb1 libogg0 libopenal-data libopenal1 libopenjpeg5 libopus0 liborc-0.4-0 libpulse0 libresid-builder0c2a libroar2 libsamplerate0 libschroedinger-1.0-0 libsdl1.2debian libshout3 libsidplay2 libsidutils0 libslp1 libsm6 libsmbclient libsndfile1 libsoxr0 libspeex1 libspeexdsp1 libsqlite3-0 libtalloc2 libtdb1 libtevent0 libtheora0 libupnp6 libva1 libvorbis0a libvorbisenc2 libvorbisfile3 libvpx1 libwavpack1 libwbclient0 libwildmidi-config libwildmidi1 libx11-6 libx11-data libx11-xcb1 libx264-142 libxau6 libxcb1 libxdmcp6 libxext6 libxi6 libxtst6 libxvidcore4 libyajl2 libzzip-0-13 mime-support python python-talloc python2.7 samba-libs x11-common file --no-install-recommends
+
+				else
+
+					AGI mpd
+
+				fi
+
+				#Overwrite with our newer compiled .deb's
+				#	Stretch is same version as ours at this time (0.19.19)
+				if (( $DISTRO == 3 )); then
+
+					wget "$INSTALL_URL_ADDRESS" -O package.deb
+					dpkg -i package.deb
+					rm package.deb
+
+				fi
+
+			else
+
+				Error_NoConnection_NoInstall
+
+			fi
+
+		fi
+
 		#Forums PHPBB
 		INSTALLING_INDEX=54
 		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
@@ -3012,7 +3472,7 @@ _EOF_
 
 			if (( $? == 0 )); then
 
-				AGI libsodium-dev automake autoconf pkg-config libtool libssl-dev libffi-dev python-dev openssl python-pip libzmq3-dev
+				AGI libsodium-dev automake autoconf pkg-config libtool libssl-dev libffi-dev python-dev openssl libzmq3-dev
 
 				#Not required.
 				#AGI software-properties-common
@@ -3021,11 +3481,10 @@ _EOF_
 
 				pip install cryptography
 
-
 				cd "$HOME"
-				git clone --depth 1 https://github.com/zeromq/libzmq
-				git clone --depth 1 https://github.com/pyca/pynacl/
-				git clone --depth 1 "$INSTALL_URL_ADDRESS"
+				git clone --depth=1 https://github.com/zeromq/libzmq
+				git clone --depth=1 https://github.com/pyca/pynacl/
+				git clone --depth=1 "$INSTALL_URL_ADDRESS"
 
 				# - compile
 				cd "$HOME"/libzmq
@@ -3061,6 +3520,27 @@ _EOF_
 
 		fi
 
+		#YACY
+		INSTALLING_INDEX=133
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Banner_Installing
+
+			INSTALL_URL_ADDRESS='http://yacy.net/release/yacy_v1.92_20161226_9000.tar.gz'
+			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
+			if (( $? == 0 )); then
+
+				wget "$INSTALL_URL_ADDRESS" -O package.tar.gz
+				tar xvf package.tar.gz -C /etc/
+				rm package.tar.gz
+
+			else
+
+				Error_NoConnection_NoInstall
+
+			fi
+
+		fi
 
 		#OwnCloud
 		INSTALLING_INDEX=47
@@ -3102,7 +3582,7 @@ _EOF_
 
 			Banner_Installing
 
-			INSTALL_URL_ADDRESS='https://download.nextcloud.com/server/releases/nextcloud-11.0.0.zip'
+			INSTALL_URL_ADDRESS='https://download.nextcloud.com/server/releases/latest-12.zip'
 
 			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
 			#Install
@@ -3120,7 +3600,7 @@ _EOF_
 
 		fi
 
-		#Hifi
+		#YMPD
 		INSTALLING_INDEX=32
 		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
 
@@ -3133,12 +3613,12 @@ _EOF_
 				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/ympd-1.3.0-armv6.tar.bz2'
 
 			# - armv7
-			elif (( $HW_ARCH >= 2 && $HW_ARCH < 10 )); then
+			elif (( $HW_ARCH == 2 )); then
 
 				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/ympd-1.3.0-armv7.tar.bz2'
 
 			# - arm64
-			elif (( $HW_ARCH >= 10 && $HW_ARCH < 20 )); then
+			elif (( $HW_ARCH == 3 )); then
 
 				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/ympd-1.2.3-arm64.tar.bz2'
 
@@ -3160,56 +3640,6 @@ _EOF_
 
 			fi
 
-			#MPD
-			# - armv6
-			if (( $HW_ARCH == 1 )); then
-
-				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/mpd_0.19.19_armv6.deb'
-
-			# - armv7+
-			elif (( $HW_ARCH >= 2 && $HW_ARCH < 10 )); then
-
-				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/mpd_0.19.19_armv7.deb'
-
-			# - arm64
-			elif (( $HW_ARCH >= 10 && $HW_ARCH < 20 )); then
-
-				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/mpd_0.19.19_arm64.deb'
-
-			fi
-			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
-
-			#	Install
-			if (( $? == 0 )); then
-
-				# - ARM64 not available in Jessie repos
-				if (( $DISTRO == 3 &&
-					$HW_ARCH == 10 )); then
-
-					AGI libmpdclient2 libao-common libao4 libasound2 libasound2-data libasyncns0 libaudiofile1 libavahi-client3 libavahi-common-data libavahi-common3 libavcodec56 libavformat56 libavresample2 libavutil54 libbinio1ldbl libcaca0 libcdio-cdda1 libcdio-paranoia1 libcdio13 libcups2 libcurl3-gnutls libdirectfb-1.2-9 libdnet libfaad2 libflac8 libfluidsynth1 libgme0 libgomp1 libgsm1 libice6 libid3tag0 libiso9660-8 libjack-jackd2-0 libjson-c2 libldb1 libmad0 libmikmod3 libmms0 libmodplug1 libmp3lame0 libmpcdec6 libmpg123-0 libnfs4 libntdb1 libogg0 libopenal-data libopenal1 libopenjpeg5 libopus0 liborc-0.4-0 libpulse0 libresid-builder0c2a libroar2 libsamplerate0 libschroedinger-1.0-0 libsdl1.2debian libshout3 libsidplay2 libsidutils0 libslp1 libsm6 libsmbclient libsndfile1 libsoxr0 libspeex1 libspeexdsp1 libsqlite3-0 libtalloc2 libtdb1 libtevent0 libtheora0 libupnp6 libva1 libvorbis0a libvorbisenc2 libvorbisfile3 libvpx1 libwavpack1 libwbclient0 libwildmidi-config libwildmidi1 libx11-6 libx11-data libx11-xcb1 libx264-142 libxau6 libxcb1 libxdmcp6 libxext6 libxi6 libxtst6 libxvidcore4 libyajl2 libzzip-0-13 mime-support python python-talloc python2.7 samba-libs x11-common file --no-install-recommends
-
-				else
-
-					AGI mpd
-
-				fi
-
-				#Overwrite with our newer compiled .deb's
-				#	Stretch is same version as ours at this time (0.19.19)
-				if (( $DISTRO == 3 )); then
-
-					wget "$INSTALL_URL_ADDRESS" -O package.deb
-					dpkg -i package.deb
-					rm package.deb
-
-				fi
-
-			else
-
-				Error_NoConnection_NoInstall
-
-			fi
-
 		fi
 
 		#Roon Bridge
@@ -3218,7 +3648,18 @@ _EOF_
 
 			Banner_Installing
 
-			INSTALL_URL_ADDRESS='http://download.roonlabs.com/builds/RoonBridge_linuxarmv7hf.tar.bz2'
+			#ARMv8
+			if (( $HW_ARCH == 3 )); then
+
+				INSTALL_URL_ADDRESS='http://download.roonlabs.com/builds/RoonBridge_linuxarmv8.tar.bz2'
+
+			#ARMv7
+			else
+
+				INSTALL_URL_ADDRESS='http://download.roonlabs.com/builds/RoonBridge_linuxarmv7hf.tar.bz2'
+
+			fi
+
 			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
 
 			#	Install
@@ -3227,6 +3668,9 @@ _EOF_
 				wget "$INSTALL_URL_ADDRESS" -O package.tar.bz2
 				tar xvf package.tar.bz2
 				rm package.tar.bz2
+
+				# - reinstall, clear dir, prevent mv fail on non-empty dir
+				rm -R /etc/roonbridge &> /dev/null
 
 				mkdir -p /etc/roonbridge
 				mv RoonBridge/* /etc/roonbridge
@@ -3252,12 +3696,12 @@ _EOF_
 				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/cava_0.4.2_armv6.deb'
 
 			# - armv7
-			elif (( $HW_ARCH >= 2 && $HW_ARCH < 10 )); then
+			elif (( $HW_ARCH == 2 )); then
 
 				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/cava_0.4.2_armv7.deb'
 
 			# - arm64
-			elif (( $HW_ARCH >= 10 && $HW_ARCH < 20 )); then
+			elif (( $HW_ARCH == 3 )); then
 
 				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/cava_0.4.2_arm64.deb'
 
@@ -3301,12 +3745,12 @@ _EOF_
 				wget https://apt.mopidy.com/jessie.list -O /etc/apt/sources.list.d/mopidy.list
 
 				apt-get update
-				AGI mopidy python-pip
+				AGI mopidy
 
-				#ARM64
+				#ARMv8
 				#NB: No ARM64 packages currently exist in mopidy repo. So it will throw a minor error when updating apt.
 				#Mopidy web client extensions not loading in webpage...
-				# if (( $HW_ARCH == 10 )); then
+				# if (( $HW_ARCH == 3 )); then
 
 					# AGI build-essential python-dev
 					# pip install mopidy #no effect, claims already upto date.
@@ -3389,7 +3833,7 @@ _EOF_
 
 				INSTALL_URL_ADDRESS="http://dietpi.com/downloads/binaries/all/noip_x32_x64.zip"
 
-			#arm64
+			#ARMv8
 			elif (( ( $HW_MODEL == 12 ) || ( $HW_MODEL >=40 && $HW_MODEL < 50 ) )); then
 
 				INSTALL_URL_ADDRESS="http://dietpi.com/downloads/binaries/all/noip_arm64.zip"
@@ -3420,13 +3864,13 @@ _EOF_
 
 		fi
 
-		#uae4arm
+		#amiberry
 		INSTALLING_INDEX=108
 		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
 
 			Banner_Installing
 
-			INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/uae4arm-rpi_v2.zip'
+			INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/amiberry-rpi_v2.1.1.7z'
 			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
 
 			#Install
@@ -3434,13 +3878,16 @@ _EOF_
 
 				AGI alsa-oss joystick libsdl-image1.2 libsdl-ttf2.0-0 libsdl-gfx1.2-5 libguichan-0.8.1-1 libguichan-allegro-0.8.1-1 libguichan-sdl-0.8.1-1 libguichan-opengl-0.8.1-1 libjpgalleg4.4 libxml2 libmpg123-0
 
+				# + SDL2
+				AGI libpng12-0 libflac8 libmpg123-0 libgoogle-perftools4 libfreetype6 libxxf86vm1
+
 				#Download binaries
 				# - Backup existing autostart.uae for user
-				mv "$FP_DIETPI_USERDATA_DIRECTORY"/uae4arm-rpi/conf/autostart.uae "$FP_DIETPI_USERDATA_DIRECTORY"/uae4arm-rpi/conf/autostart_pre-dietpi-update.uae &> /dev/null
+				mv "$FP_DIETPI_USERDATA_DIRECTORY"/amiberry/conf/autostart.uae "$FP_DIETPI_USERDATA_DIRECTORY"/amiberry/conf/autostart_pre-dietpi-update.uae &> /dev/null
 
-				wget "$INSTALL_URL_ADDRESS" -O package.zip
-				unzip -o package.zip -d /etc
-				rm package.zip
+				wget "$INSTALL_URL_ADDRESS" -O package.7z
+				7z x -y package.7z -o/etc
+				rm package.7z
 
 			else
 
@@ -3465,7 +3912,7 @@ _EOF_
 				AGI libsdl-mixer1.2 libsdl1.2debian libphysfs1
 
 				wget "$INSTALL_URL_ADDRESS" -O package.7z
-				7z x -aoa package.7z -o"$FP_DIETPI_USERDATA_DIRECTORY"
+				7z x -y package.7z -o"$FP_DIETPI_USERDATA_DIRECTORY"
 				rm package.7z
 
 			else
@@ -3482,18 +3929,18 @@ _EOF_
 
 			Banner_Installing
 
-			if (( $HW_ARCH == 21 )); then
+			if (( $HW_ARCH == 10 )); then
 
-				INSTALL_URL_ADDRESS="http://hndl.urbackup.org/Server/2.0.38/urbackup-server_2.0.38_amd64.deb"
+				INSTALL_URL_ADDRESS='http://hndl.urbackup.org/Server/2.1.19/urbackup-server_2.1.19_amd64.deb'
 
-			elif (( $HW_ARCH >= 1 && $HW_ARCH < 10 )); then
+			elif (( $HW_ARCH == 1 || $HW_ARCH == 2 )); then
 
-				INSTALL_URL_ADDRESS="http://hndl.urbackup.org/Server/2.0.38/urbackup-server_2.0.38_armhf.deb"
+				INSTALL_URL_ADDRESS='http://hndl.urbackup.org/Server/2.1.19/urbackup-server_2.1.19_armhf.deb'
 
-			#ARM64 sourcebuild
-			elif (( $HW_ARCH == 10 )); then
+			#ARMv8 sourcebuild
+			elif (( $HW_ARCH == 3 )); then
 
-				INSTALL_URL_ADDRESS="http://hndl.urbackup.org/Server/2.0.38/urbackup-server-2.0.38.tar.gz"
+				INSTALL_URL_ADDRESS='http://hndl.urbackup.org/Server/2.1.19/urbackup-server-2.1.19.tar.gz'
 
 			fi
 
@@ -3503,8 +3950,8 @@ _EOF_
 			if (( $? == 0 )); then
 
 
-				#ARM64 source build
-				if (( $HW_ARCH == 10 )); then
+				#ARMv8 source build
+				if (( $HW_ARCH == 3 )); then
 
 					AGI build-essential zlib1g-dev libcurl4-openssl-dev libcrypto++-dev sqlite3
 
@@ -3583,7 +4030,7 @@ _EOF_
 
 			Banner_Installing
 
-			INSTALL_URL_ADDRESS='https://github.com/Fourdee/RPi_Cam_Web_Interface/archive/6.1.6.zip'
+			INSTALL_URL_ADDRESS='https://github.com/Fourdee/RPi_Cam_Web_Interface/archive/6.2.29.zip'
 			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
 
 			#Install
@@ -3597,7 +4044,6 @@ _EOF_
 				unzip -o package.zip
 				rm package.zip
 
-				#work form inside RPi_Cam folder
 				cd RPi_Cam*
 
 				#Config /etc/motion
@@ -3614,8 +4060,9 @@ _EOF_
 				mknod /var/www/dietpicam/FIFO p
 				mknod /var/www/dietpicam/FIFO1 p
 
-				#Temp cam.jpg file symlink
+				#symlink cam preview and status
 				ln -sf /run/shm/mjpeg/cam.jpg /var/www/dietpicam/cam.jpg
+				ln -sf /run/shm/mjpeg/status_mjpeg.txt /var/www/dietpicam/status_mjpeg.txt
 
 				#Setup Raspimjpeg binary
 				cp bin/raspimjpeg /opt/vc/bin/raspimjpeg
@@ -3623,7 +4070,7 @@ _EOF_
 				ln -s /opt/vc/bin/raspimjpeg /usr/bin/raspimjpeg
 
 				#Cleanup / remove extracted source
-				cd "$HOME"/
+				cd "$HOME"
 				rm -R "$HOME"/RPi_Cam*
 
 			else
@@ -3753,6 +4200,39 @@ _EOF_
 
 		fi
 
+		#O!MPD
+		INSTALLING_INDEX=129
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Banner_Installing
+
+			INSTALL_URL_ADDRESS='https://github.com/ArturSierzant/OMPD/archive/master.zip'
+			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
+			if (( $? == 0 )); then
+
+				wget "$INSTALL_URL_ADDRESS" -O package.zip
+				unzip package.zip -d /var/www/
+				mv /var/www/OMPD* /var/www/ompd
+				rm package.zip
+
+			else
+
+				Error_NoConnection_NoInstall
+
+			fi
+
+		fi
+
+		#IceCast + DarkIce
+		INSTALLING_INDEX=135
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Banner_Installing
+
+			AGI darkice icecast2
+
+		fi
+
 		#LINUXDASH
 		INSTALLING_INDEX=63
 		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
@@ -3830,7 +4310,7 @@ _EOF_
 			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
 			if (( $? == 0 )); then
 
-				AGI lame
+				#AGI lame #conflicts with our ffmpeg package: https://github.com/Fourdee/DietPi/issues/946#issuecomment-300738228
 
 				#Install SubSonic 5.3
 				wget "$INSTALL_URL_ADDRESS" -O package.deb
@@ -3855,7 +4335,7 @@ _EOF_
 			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
 			if (( $? == 0 )); then
 
-				AGI lame
+				#AGI lame #conflicts with our ffmpeg package: https://github.com/Fourdee/DietPi/issues/946#issuecomment-300738228
 
 				#Install SubSonic 6.0
 				wget "$INSTALL_URL_ADDRESS" -O package.deb
@@ -3876,16 +4356,14 @@ _EOF_
 
 			Banner_Installing
 
-			INSTALL_URL_ADDRESS='https://github.com/weaved/installer/raw/master/binaries/weaved-nixinstaller_1.2.13.bin'
+			INSTALL_URL_ADDRESS='https://github.com/weaved/installer/raw/master/Raspbian%20deb/1.3-07/weavedconnectd_1.3-07v_armhf.deb'
 			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
 			if (( $? == 0 )); then
 
 				#Install WEAVED
-				wget "$INSTALL_URL_ADDRESS" -O weaved_setup.bin
-				chmod +x weaved_setup.bin
-
-				##Dont run this, let the user run it for "1st time setup"
-				#./weaved_setup.bin
+				wget "$INSTALL_URL_ADDRESS" -O package.deb
+				dpkg -i package.deb
+				rm package.deb
 
 			else
 
@@ -3940,6 +4418,11 @@ _EOF_
 
 				INSTALL_URL_ADDRESS='https://github.com/hardkernel/wiringPi/archive/master.zip'
 
+			# - BPiPro
+			elif (( $HW_MODEL == 51 )); then
+
+				INSTALL_URL_ADDRESS='https://github.com/LeMaker/WiringBP/archive/bananapro.zip'
+
 			fi
 
 			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
@@ -3953,8 +4436,8 @@ _EOF_
 					tar xfz package.tar
 					rm package.tar
 
-				# - Odroid's
-				elif (( $HW_MODEL >= 10 && $HW_MODEL < 20 )); then
+				# - Odroid's / BPI
+				else
 
 					wget "$INSTALL_URL_ADDRESS" -O package.zip
 					unzip package.zip
@@ -3962,9 +4445,16 @@ _EOF_
 
 				fi
 
+				if (( $HW_MODEL == 51 )); then
+
+					mv WiringBP* wiringPi
+
+				fi
+
 				cd wiringPi*
+				chmod +x build
 				./build
-				cd ..
+				cd "$HOME"
 
 				#rm -R /root/wiringPi* #Also Contains example code for users.
 
@@ -4023,7 +4513,7 @@ _EOF_
 				wget "$INSTALL_URL_ADDRESS" -O /etc/apt/sources.list.d/mosquitto-jessie.list
 
 				# - ARM64
-				if (( $HW_ARCH == 10 )); then
+				if (( $HW_ARCH == 3 )); then
 
 					echo -e "deb [arch=armhf] http://repo.mosquitto.org/debian jessie main" > /etc/apt/sources.list.d/mosquitto-jessie.list
 					dpkg --add-architecture armhf
@@ -4033,6 +4523,36 @@ _EOF_
 				apt-get update
 
 				AGI mosquitto
+
+			else
+
+				Error_NoConnection_NoInstall
+
+			fi
+
+		fi
+
+		#Blynk Server
+		INSTALLING_INDEX=131
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Banner_Installing
+
+			#Binary URL fails connection test, so we need to parent back a little: https://github.com/Fourdee/DietPi/issues/445#issuecomment-283400449
+			INSTALL_URL_ADDRESS='https://github.com/blynkkk/blynk-server/releases'
+			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
+
+			if (( $? == 0 )); then
+
+				mkdir -p /etc/blynkserver
+
+				INSTALL_URL_ADDRESS='https://github.com/blynkkk/blynk-server/releases/download/v0.24.1/server-0.24.1.jar'
+				wget "$INSTALL_URL_ADDRESS" -O /etc/blynkserver/server.jar
+
+				# - Install Blynk JS Libary
+				AGI python
+				npm install -g onoff
+				npm install -g blynk-library
 
 			else
 
@@ -4055,14 +4575,18 @@ _EOF_
 
 			fi
 
-			#Packages requires from Stretch
-			local apackages=(
+			#Packages
+			local apackages=()
 
-				'http://ftp.us.debian.org/debian/pool/main/g/gcc-6/gcc-6-base_6.2.1-5_armhf.deb'
-				'http://ftp.us.debian.org/debian/pool/main/g/gcc-6/libstdc++6_6.2.1-5_armhf.deb'
-				'https://www.signalyst.eu/bins/naa/linux/stretch/networkaudiod_3.4.2-33_armhf.deb'
+			#	Jessie - requires stretch packages
+			if (( $DISTRO == 3 )); then
 
-			)
+				apackages+=('http://dietpi.com/downloads/binaries/all/gcc-6-base_6.3.0-6_armhf.deb')
+				apackages+=('http://dietpi.com/downloads/binaries/all/libstdc++6_6.3.0-6_armhf.deb')
+
+			fi
+
+			apackages+=('https://www.signalyst.eu/bins/naa/linux/stretch/networkaudiod_3.5.1-35_armhf.deb')
 
 			# - check online
 			for ((i=0; i<${#apackages[@]}; i++))
@@ -4085,6 +4609,13 @@ _EOF_
 
 				# - Prereqs
 				AGI libasound2
+
+				# - Stretch, install additional packages
+				if (( $DISTRO == 4 )); then
+
+					AGI gcc-6-base libstdc++6
+
+				fi
 
 				for ((i=0; i<${#apackages[@]}; i++))
 				do
@@ -4179,7 +4710,7 @@ _EOF_
 			Banner_Installing
 
 
-			INSTALL_URL_ADDRESS='http://www.haproxy.org/download/1.6/src/haproxy-1.6.9.tar.gz'
+			INSTALL_URL_ADDRESS='http://www.haproxy.org/download/1.7/src/haproxy-1.7.2.tar.gz'
 			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
 
 			#Install
@@ -4235,6 +4766,9 @@ _EOF_
 				dpkg -i package.deb
 				rm package.deb
 
+				#https://github.com/Fourdee/DietPi/issues/736
+				AGF
+
 				#Stop service
 				service logitechmediaserver stop
 
@@ -4246,7 +4780,7 @@ _EOF_
 					rm package.tar
 
 				# + ARM64 cpan
-				elif (( $HW_ARCH == 10 )); then
+				elif (( $HW_ARCH == 3 )); then
 
 					AGI libxml-parser-perl
 					AGI zlib1g-dev libjpeg-dev libpng-dev libjpeg62-turbo-dev # shared libs needed for Image::Scale@0.08
@@ -4430,7 +4964,7 @@ _EOF_
 
 				cd /var/www/ampache
 				composer install --prefer-source --no-interaction
-				cd ~/
+				cd "$HOME"
 
 			else
 
@@ -4584,7 +5118,7 @@ _EOF_
 					fi
 
 				# - armv7+
-				elif (( $HW_ARCH >= 2 && $HW_ARCH < 10 )); then
+				elif (( $HW_ARCH == 2 )); then
 
 					filename_hostapd='hostapd-nl80211-armv7'
 					filename_hostapd_cli='hostapd_cli-armv7'
@@ -4596,7 +5130,7 @@ _EOF_
 					fi
 
 				# - arm64
-				elif (( $HW_ARCH >= 10 && $HW_ARCH < 20 )); then
+				elif (( $HW_ARCH == 3 )); then
 
 					filename_hostapd='hostapd-nl80211-arm64'
 					filename_hostapd_cli='hostapd_cli-arm64'
@@ -4646,21 +5180,22 @@ _EOF_
 
 			Banner_Installing
 
+			INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/shairport-sync_3.0.2_'
 
 			# - ARMv6
 			if (( $HW_ARCH == 1 )); then
 
-				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/shairport-sync-dietpi_armv6.deb'
+				INSTALL_URL_ADDRESS+='armv6.deb'
 
 			# - ARMv7
-			elif (( $HW_ARCH >= 2 && $HW_ARCH < 10 )); then
+			elif (( $HW_ARCH == 2 )); then
 
-				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/shairport-sync-dietpi_armv7.deb'
+				INSTALL_URL_ADDRESS+='armv7.deb'
 
 			# - ARM64
-			elif (( $HW_ARCH >= 10 && $HW_ARCH < 20 )); then
+			elif (( $HW_ARCH == 3 )); then
 
-				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/shairport-sync-dietpi_arm64.deb'
+				INSTALL_URL_ADDRESS+='arm64.deb'
 
 			fi
 
@@ -4673,7 +5208,7 @@ _EOF_
 				AGI openssl avahi-daemon libsoxr0 libavahi-client3 libtool libconfig9 libpopt0 libdaemon0 --no-install-recommends
 
 				# This occured on C2: shairport-sync : Depends: libpopt-dev but it is not installed
-				AGI libpopt-dev
+				#AGI libpopt-dev
 
 				wget "$INSTALL_URL_ADDRESS" -O package.deb
 				dpkg -i package.deb
@@ -4721,7 +5256,7 @@ _EOF_
 			Banner_Installing
 
 			#check folder is online
-			INSTALL_URL_ADDRESS='http://sourceforge.net/projects/ajaxplorer/files/pydio/stable-channel/6.2.2/pydio-core-6.2.2.zip/download'
+			INSTALL_URL_ADDRESS='https://download.pydio.com/pub/core/archives/pydio-core-8.0.1.zip'
 			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
 
 			#Install
@@ -4757,7 +5292,7 @@ _EOF_
 
 				# - Overwrite binary with latest version:
 				wget "$INSTALL_URL_ADDRESS" -O package.7z
-				7z x -aoa package.7z -o/usr/bin
+				7z x -y package.7z -o/usr/bin
 				rm package.7z
 
 				rm /usr/bin/squeezelite
@@ -4769,12 +5304,12 @@ _EOF_
 					target_binary='squeezelite_armv6'
 
 				# - ARMv7
-				elif (( $HW_ARCH >= 2 && $HW_ARCH < 10 )); then
+				elif (( $HW_ARCH == 2 )); then
 
 					target_binary='squeezelite_armv7'
 
 				# - ARM64
-				elif (( $HW_ARCH >= 10 && $HW_ARCH < 20 )); then
+				elif (( $HW_ARCH == 3 )); then
 
 					target_binary='squeezelite_arm64'
 
@@ -4806,7 +5341,7 @@ _EOF_
 			if (( $? == 0 )); then
 
 				# - Prereqs
-				AGI minicom python-pip python-serial python-configobj --no-install-recommends
+				AGI minicom python-serial python-configobj --no-install-recommends
 				pip install paho-mqtt pydispatcher
 
 				wget "$INSTALL_URL_ADDRESS" -O package.zip
@@ -4861,20 +5396,27 @@ _EOF_
 
 			Banner_Installing
 
-			#Rpi 1
-			if (( $HW_MODEL < 2 )); then
+			INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/netdata_1.6.0_'
 
-				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/netdata_1.4.0_armv6.deb'
+			#armv6
+			if (( $HW_ARCH == 1 )); then
 
-			#arm64
-			elif (( ( $HW_MODEL == 12 ) || ( $HW_MODEL >= 40 && $HW_MODEL < 50 ) )); then
+				INSTALL_URL_ADDRESS+='armv6.deb'
 
-				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/netdata_1.4.0_arm64.deb'
+			#armv7+
+			elif (( $HW_ARCH == 2 )); then
 
-			#all others
-			else
+				INSTALL_URL_ADDRESS+='armv7.deb'
 
-				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/netdata_1.4.0_armv7.deb'
+			#ARMv8
+			elif (( $HW_ARCH == 3 )); then
+
+				INSTALL_URL_ADDRESS+='arm64.deb'
+
+			#amd64
+			elif (( $HW_ARCH == 10 )); then
+
+				INSTALL_URL_ADDRESS+='amd64.deb'
 
 			fi
 
@@ -4972,7 +5514,7 @@ _EOF_
 
 				# - Alternative mono repo: https://github.com/Fourdee/DietPi/issues/310#issuecomment-216247879
 				apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
-				echo -e "deb http://download.mono-project.com/repo/debian beta main" > /etc/apt/sources.list.d/mono-xamarin.list
+				echo -e "deb http://download.mono-project.com/repo/debian jessie main" > /etc/apt/sources.list.d/mono-xamarin.list
 
 				####################################################################################
 				# - Emby repo
@@ -4990,17 +5532,17 @@ _EOF_
 
 				#	libjpeg8 not available in Jessie, grab from sid.
 				#armv6+
-				if (( $HW_ARCH >= 1 && $HW_ARCH < 10 )); then
+				if (( $HW_ARCH == 1 || $HW_ARCH == 2 )); then
 
 					INSTALL_URL_ADDRESS='http://ftp.us.debian.org/debian/pool/main/libj/libjpeg8/libjpeg8_8d1-2_armhf.deb'
 
-				#arm64
-				elif (( $HW_ARCH == 10 )); then
+				#ARMv8
+				elif (( $HW_ARCH == 3 )); then
 
 					INSTALL_URL_ADDRESS='http://ftp.us.debian.org/debian/pool/main/libj/libjpeg8/libjpeg8_8d1-2_arm64.deb'
 
 				#x86_64
-				elif (( $HW_ARCH == 21 )); then
+				elif (( $HW_ARCH == 10 )); then
 
 					INSTALL_URL_ADDRESS='http://ftp.us.debian.org/debian/pool/main/libj/libjpeg8/libjpeg8_8d1-2_amd64.deb'
 
@@ -5031,9 +5573,9 @@ _EOF_
 			#check folder is online
 
 			#x86_64
-			if (( $HW_ARCH == 21 )); then
+			if (( $HW_ARCH == 10 )); then
 
-				INSTALL_URL_ADDRESS='https://downloads.plex.tv/plex-media-server/1.0.0.2261-a17e99e/plexmediaserver_1.0.0.2261-a17e99e_amd64.deb'
+				INSTALL_URL_ADDRESS='https://downloads.plex.tv/plex-media-server/1.5.6.3790-4613ce077/plexmediaserver_1.5.6.3790-4613ce077_amd64.deb'
 
 			#ARM
 			else
@@ -5048,7 +5590,7 @@ _EOF_
 			if (( $? == 0 )); then
 
 				#x86_64
-				if (( $HW_ARCH == 21 )); then
+				if (( $HW_ARCH == 10 )); then
 
 					wget "$INSTALL_URL_ADDRESS" -O package.deb
 					dpkg -i package.deb
@@ -5061,8 +5603,8 @@ _EOF_
 					wget -O - "$INSTALL_URL_ADDRESS"dev2day-pms.gpg.key | apt-key add -
 					apt-get update
 
-					#ARM64: Install 32bit binaries
-					if (( $HW_ARCH == 10 )); then
+					#ARMv8: Install 32bit binaries
+					if (( $HW_ARCH == 3 )); then
 
 						dpkg --add-architecture armhf
 						apt-get update
@@ -5092,12 +5634,12 @@ _EOF_
 			Banner_Installing
 
 			#x86_64
-			if (( $HW_ARCH == 21 )); then
+			if (( $HW_ARCH == 10 )); then
 
 				INSTALL_URL_ADDRESS='http://builds.cuberite.org/job/Cuberite%20Linux%20x64%20Master/lastSuccessfulBuild/artifact/Cuberite.tar.gz'
 
 			#32bit ARM
-			elif (( $HW_ARCH >= 1 && $HW_ARCH < 10 )); then
+			elif (( $HW_ARCH == 1 || $HW_ARCH == 2 )); then
 
 				INSTALL_URL_ADDRESS='http://builds.cuberite.org/job/Cuberite%20Linux%20raspi-armhf%20Master/lastSuccessfulBuild/artifact/Cuberite.tar.gz'
 
@@ -5167,20 +5709,22 @@ _EOF_
 
 			Banner_Installing
 
+			INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/gogs_'
+
 			#armv6
 			if (( $HW_ARCH == 1 )); then
 
-				INSTALL_URL_ADDRESS='https://dl.gogs.io/gogs_latest_linux_arm.zip'
+				INSTALL_URL_ADDRESS+='armv6.zip'
 
 			#armv7+
-			elif (( $HW_ARCH >= 2 && $HW_ARCH < 10 )); then
+			elif (( $HW_ARCH == 2 )); then
 
-				INSTALL_URL_ADDRESS='https://dl.gogs.io/gogs_latest_raspi2.zip'
+				INSTALL_URL_ADDRESS+='armv7.zip'
 
 			#x86_64
-			elif (( $HW_ARCH == 21 )); then
+			elif (( $HW_ARCH == 10 )); then
 
-				INSTALL_URL_ADDRESS='https://dl.gogs.io/gogs_latest_linux_amd64.zip'
+				INSTALL_URL_ADDRESS+='amd64.zip'
 			fi
 
 			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
@@ -5254,7 +5798,78 @@ _EOF_
 
 		fi
 
-		#SICKRAGE
+		#Aria2
+		INSTALLING_INDEX=132
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Banner_Installing
+
+			#aria2 binary
+			INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/aria2_'
+
+			# - armv6
+			if (( $HW_ARCH == 1 )); then
+
+				INSTALL_URL_ADDRESS+='armv6.7z'
+
+			# - armv7+
+			elif (( $HW_ARCH == 2 )); then
+
+				INSTALL_URL_ADDRESS+='armv7.7z'
+
+			# - arm64
+			elif (( $HW_ARCH == 3 )); then
+
+				INSTALL_URL_ADDRESS+='arm64.7z'
+
+			# - x86_64
+			elif (( $HW_ARCH == 10 )); then
+
+				INSTALL_URL_ADDRESS+='x86_64.7z'
+
+			fi
+
+			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
+			if (( $? == 0 )); then
+
+				# - prereqs
+				AGI libc-ares2
+
+				wget "$INSTALL_URL_ADDRESS" -O package.7z
+				7z x -y package.7z
+				rm package.7z
+
+				mv aria2_* /usr/local/bin/aria2c
+				chmod +x /usr/local/bin/aria2c
+
+			else
+
+				Error_NoConnection_NoInstall
+
+			fi
+
+			#Web interface
+			INSTALL_URL_ADDRESS='https://github.com/ziahamza/webui-aria2/archive/master.zip'
+
+			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
+			if (( $? == 0 )); then
+
+				wget "$INSTALL_URL_ADDRESS" -O package.zip
+				unzip -o package.zip
+				rm package.zip
+
+				cp -R webui-aria2* /var/www/aria2
+				rm -R webui-aria2*
+
+			else
+
+				Error_NoConnection_NoInstall
+
+			fi
+
+		fi
+
+ 		#SICKRAGE
 		INSTALLING_INDEX=116
 		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
 
@@ -5303,17 +5918,17 @@ _EOF_
 			Banner_Installing
 
 			# - armv6+
-			if (( $HW_ARCH >= 1 && $HW_ARCH < 10 )); then
+			if (( $HW_ARCH == 1 || $HW_ARCH == 2 )); then
 
 				INSTALL_URL_ADDRESS='https://github.com/syncthing/syncthing/releases/download/v0.14.15/syncthing-linux-arm-v0.14.15.tar.gz'
 
 			# - arm64
-			elif (( $HW_ARCH == 10 )); then
+			elif (( $HW_ARCH == 3 )); then
 
 				INSTALL_URL_ADDRESS='https://github.com/syncthing/syncthing/releases/download/v0.14.15/syncthing-linux-arm64-v0.14.15.tar.gz'
 
 			# - x86_64
-			elif (( $HW_ARCH == 21 )); then
+			elif (( $HW_ARCH == 10 )); then
 
 				INSTALL_URL_ADDRESS='https://github.com/syncthing/syncthing/releases/download/v0.14.15/syncthing-linux-amd64-v0.14.15.tar.gz'
 
@@ -5341,19 +5956,19 @@ _EOF_
 
 			#inotify
 			# - armv6+
-			if (( $HW_ARCH >= 1 && $HW_ARCH < 10 )); then
+			if (( $HW_ARCH == 1 || $HW_ARCH == 2 )); then
 
-				INSTALL_URL_ADDRESS='https://github.com/syncthing/syncthing-inotify/releases/download/v0.8.4/syncthing-inotify-linux-arm-v0.8.4.tar.gz'
+				INSTALL_URL_ADDRESS='https://github.com/syncthing/syncthing-inotify/releases/download/v0.8.5/syncthing-inotify-linux-arm-v0.8.5.tar.gz'
 
 			# - arm64
-			elif (( $HW_ARCH == 10 )); then
+			elif (( $HW_ARCH == 3 )); then
 
-				INSTALL_URL_ADDRESS='https://github.com/syncthing/syncthing-inotify/releases/download/v0.8.4/syncthing-inotify-linux-arm-v0.8.4.tar.gz'
+				INSTALL_URL_ADDRESS='https://github.com/syncthing/syncthing-inotify/releases/download/v0.8.5/syncthing-inotify-linux-arm-v0.8.5.tar.gz'
 
 			# - x86_64
-			elif (( $HW_ARCH == 21 )); then
+			elif (( $HW_ARCH == 10 )); then
 
-				INSTALL_URL_ADDRESS='https://github.com/syncthing/syncthing-inotify/releases/download/v0.8.4/syncthing-inotify-linux-amd64-v0.8.4.tar.gz'
+				INSTALL_URL_ADDRESS='https://github.com/syncthing/syncthing-inotify/releases/download/v0.8.5/syncthing-inotify-linux-amd64-v0.8.5.tar.gz'
 
 			fi
 
@@ -5377,21 +5992,236 @@ _EOF_
 
 		fi
 
+		#TONIDO
+		INSTALLING_INDEX=134
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Banner_Installing
+
+			#Libjpeg8
+			# - armv6? http://ftp.us.debian.org/debian/pool/main/libj/libjpeg8/libjpeg8_8d-1+deb7u1_armel.deb
+
+			# - armv6/7
+			if (( $HW_ARCH == 1 || $HW_ARCH == 2 )); then
+
+				INSTALL_URL_ADDRESS='http://ftp.us.debian.org/debian/pool/main/libj/libjpeg8/libjpeg8_8d1-2_armhf.deb'
+
+			# - x86_64
+			elif (( $HW_ARCH == 10 )); then
+
+				INSTALL_URL_ADDRESS='http://ftp.us.debian.org/debian/pool/main/libj/libjpeg8/libjpeg8_8d1-2_amd64.deb'
+
+			fi
+
+			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
+			if (( $? == 0 )); then
+
+				wget "$INSTALL_URL_ADDRESS" -O package.deb
+				dpkg -i package.deb
+				rm package.deb
+
+			else
+
+				Error_NoConnection_NoInstall
+
+			fi
+
+
+			# - armv6+
+			if (( $HW_ARCH == 1 || $HW_ARCH == 2 )); then
+
+				INSTALL_URL_ADDRESS='http://patch.codelathe.com/tonido/live/installer/armv6l-rpi/tonido.tar.gz'
+
+			# - x86_64
+			elif (( $HW_ARCH == 10 )); then
+
+				INSTALL_URL_ADDRESS='http://www.tonido.com/download.php?tonido64.tar.gz'
+
+			fi
+
+			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
+			if (( $? == 0 )); then
+
+				AGI libpng12-0 libfontconfig1
+
+				wget "$INSTALL_URL_ADDRESS" -O package.tar
+				mkdir /etc/tonido
+				tar xvf package.tar -C /etc/tonido
+				rm package.tar
+
+			else
+
+				Error_NoConnection_NoInstall
+
+			fi
+
+		fi
+
 		#CHROMIUM
 		INSTALLING_INDEX=113
 		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
 
 			Banner_Installing
 
+			#Stretch via apt
+			if (( $DISTRO >= 4 )); then
+
+				AGI chromium
+
+			else
+
+				#armv6+
+				if (( $HW_ARCH == 1 || $HW_ARCH == 2 )); then
+
+					INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/chromium_52.0.2743.116-1-deb8u1.1_armhf.deb'
+
+				#ARMv8
+				elif (( $HW_ARCH == 3 )); then
+
+					INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/chromium_52.0.2743.116-1-deb8u1.1_arm64.deb'
+
+				fi
+
+				/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
+
+				#Install
+				if (( $? == 0 )); then
+
+					wget "$INSTALL_URL_ADDRESS" -O package.deb
+					dpkg -i package.deb
+
+					# - Odroid's, 'apt-get install -f' removes chromium package, rather than install required deps...
+					if (( $HW_MODEL >= 10 && $HW_MODEL < 20 )); then
+
+						AGI libgnome-keyring0 libnspr4 libnss3 libnss3-1d libspeechd2 libxslt1.1 libxss1 xdg-utils libgnome-keyring-common libltdl7
+
+					else
+
+						AGF
+
+					fi
+
+					wget http://dietpi.com/downloads/binaries/all/chromium-l10n_52.0.2743.116-1-deb8u1.1_all.deb -O package.deb
+					dpkg -i package.deb
+
+					#	armv6+
+					if (( $HW_ARCH == 1 || $HW_ARCH == 2 )); then
+
+						wget http://dietpi.com/downloads/binaries/all/chromedriver_52.0.2743.116-1-deb8u1.1_armhf.deb -O package.deb
+						dpkg -i package.deb
+
+					#	arm64
+					elif (( $HW_ARCH == 3 )); then
+
+						wget http://dietpi.com/downloads/binaries/all/chromedriver_52.0.2743.116-1-deb8u1.1_arm64.deb -O package.deb
+						dpkg -i package.deb
+
+					fi
+
+					rm package.deb
+
+					# - Prevent Debian repo from replacing our chromium packages: https://github.com/Fourdee/DietPi/issues/658
+					apt-mark hold chromium chromedriver
+
+				else
+
+					Error_NoConnection_NoInstall
+
+				fi
+
+			fi
+
+		fi
+
+		#MotionEye
+		INSTALLING_INDEX=136
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Banner_Installing
+
+			INSTALL_URL_ADDRESS='http://github.com/Motion-Project/motion/releases/download/release-4.0.1/pi_jessie_motion_4.0.1-1_armhf.deb'
+
+			#url/redireect always fails wget spider test...
+			/DietPi/dietpi/func/check_connection "http://github.com/Motion-Project/motion"
+			if (( $? == 0 )); then
+
+				# - Prereqs
+				AGI v4l-utils python python-dev curl libssl-dev libcurl4-openssl-dev libjpeg-dev libx264-142 libavcodec56 libavformat56 libmysqlclient18 libswscale3 libpq5
+
+				# - Motion
+				wget "$INSTALL_URL_ADDRESS" -O package.deb
+				dpkg -i package.deb
+				rm package.deb
+
+				# - Motioneye
+				pip install motioneye
+
+			else
+
+				Error_NoConnection_NoInstall
+
+			fi
+
+		fi
+
+		#CloudPrint
+		INSTALLING_INDEX=137
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Banner_Installing
+
+			if (( $DISTRO == 3 )); then #https://github.com/Fourdee/DietPi/issues/855#issuecomment-292712002
+
+				INSTALL_URL_ADDRESS='http://davesteele.github.io/cloudprint-service'
+
+				#url/redirect fails wget spider test...
+				/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
+				if (( $? == 0 )); then
+
+					INSTALL_URL_ADDRESS+='/repo'
+
+					echo -e "deb $INSTALL_URL_ADDRESS cloudprint-jessie main" > /etc/apt/sources.list.d/cloudprint.list
+					wget -q -O - https://davesteele.github.io/key-366150CE.pub.txt | apt-key add -
+					apt-get update
+
+					AGI cloudprint-service
+
+				else
+
+					Error_NoConnection_NoInstall
+
+				fi
+
+			else
+
+				AGI cloudprint-service
+
+			fi
+
+		fi
+
+		#VirtualHere
+		INSTALLING_INDEX=138
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Banner_Installing
+
+			INSTALL_URL_ADDRESS='https://virtualhere.com/sites/default/files/usbserver/vhusbd'
+
 			#armv6+
-			if (( $HW_ARCH >= 1 && $HW_ARCH < 10 )); then
+			if (( $HW_ARCH == 1 || $HW_ARCH == 2 )); then
 
-				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/chromium_52.0.2743.116-1-deb8u1.1_armhf.deb'
+				INSTALL_URL_ADDRESS+='arm'
 
-			#arm64
+			#ARMv8
+			elif (( $HW_ARCH == 3 )); then
+
+				INSTALL_URL_ADDRESS+='arm64'
+
+			#x86_64
 			elif (( $HW_ARCH == 10 )); then
 
-				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/chromium_52.0.2743.116-1-deb8u1.1_arm64.deb'
+				INSTALL_URL_ADDRESS+='x86_64'
 
 			fi
 
@@ -5400,41 +6230,327 @@ _EOF_
 			#Install
 			if (( $? == 0 )); then
 
-				wget "$INSTALL_URL_ADDRESS" -O package.deb
-				dpkg -i package.deb
+				#prereqs
+				AGI avahi-daemon
 
-				# - Odroid's, 'apt-get install -f' removes chromium package, rather than install required deps...
-				if (( $HW_MODEL >= 10 && $HW_MODEL < 20 )); then
+				mkdir -p /etc/vhusbd
 
-					AGI libgnome-keyring0 libnspr4 libnss3 libnss3-1d libspeechd2 libxslt1.1 libxss1 xdg-utils libgnome-keyring-common libltdl7
+				wget "$INSTALL_URL_ADDRESS" -O /etc/vhusbd/vhusbd
+				chmod +x /etc/vhusbd/vhusbd
+
+			else
+
+				Error_NoConnection_NoInstall
+
+			fi
+
+		fi
+
+		#sabnzbd
+		INSTALLING_INDEX=139
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Banner_Installing
+
+			local version='2.0.1'
+
+			INSTALL_URL_ADDRESS="https://github.com/sabnzbd/sabnzbd/archive/$version.zip"
+
+			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
+			if (( $? == 0 )); then
+
+				#prereqs
+				AGI par2 python-dev libffi-dev libssl-dev
+
+				if (( $HW_MODEL < 10 )); then
+
+					AGI unrar-free
 
 				else
 
-					AGF
+					AGI unrar
 
 				fi
 
-				wget http://dietpi.com/downloads/binaries/all/chromium-l10n_52.0.2743.116-1-deb8u1.1_all.deb -O package.deb
-				dpkg -i package.deb
+				wget "$INSTALL_URL_ADDRESS" -O package.zip
+				mkdir -p /etc/sabnzbd
+				unzip package.zip -d /etc/sabnzbd
+				rm package.zip
 
-				#	armv6+
-				if (( $HW_ARCH >= 1 && $HW_ARCH < 10 )); then
+				mv /etc/sabnzbd/sabnzbd-"$version"/* /etc/sabnzbd/
+				rm -R /etc/sabnzbd/sabnzbd-"$version"
 
-					wget http://dietpi.com/downloads/binaries/all/chromedriver_52.0.2743.116-1-deb8u1.1_armhf.deb -O package.deb
-					dpkg -i package.deb
+				pip install cheetah cryptography sabyenc
 
-				#	arm64
-				elif (( $HW_ARCH == 10 )); then
+			else
 
-					wget http://dietpi.com/downloads/binaries/all/chromedriver_52.0.2743.116-1-deb8u1.1_arm64.deb -O package.deb
-					dpkg -i package.deb
+				Error_NoConnection_NoInstall
 
-				fi
+			fi
 
-				rm package.deb
+		fi
 
-				# - Prevent Debian repo from replacing our chromium packages: https://github.com/Fourdee/DietPi/issues/658
-				apt-mark hold chromium chromedriver
+		#spotifyconnectweb
+		INSTALLING_INDEX=141
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Banner_Installing
+
+			INSTALL_URL_ADDRESS='https://github.com/Fornoth/spotify-connect-web/releases' #full path fails wget spider test...
+			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
+			if (( $? == 0 )); then
+
+				INSTALL_URL_ADDRESS+='/download/0.0.3-alpha/spotify-connect-web_0.0.3-alpha.tar.gz'
+
+				wget "$INSTALL_URL_ADDRESS" -O package.tar
+				tar zxvf package.tar -C "$FP_DIETPI_USERDATA_DIRECTORY"/
+				rm package.tar
+
+			else
+
+				Error_NoConnection_NoInstall
+
+			fi
+
+		fi
+
+		#couchpotato
+		INSTALLING_INDEX=142
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Banner_Installing
+
+			INSTALL_URL_ADDRESS='https://github.com/CouchPotato/CouchPotatoServer/archive/master.zip'
+			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
+			if (( $? == 0 )); then
+
+				AGI libffi-dev libssl-dev python-lxml python3-lxml
+
+				wget "$INSTALL_URL_ADDRESS" -O package.zip
+				unzip package.zip
+				rm package.zip
+
+				rm -R /etc/couchpotato &> /dev/null
+				mv CouchPotato* /etc/couchpotato
+
+				pip install --upgrade pyopenssl
+
+			else
+
+				Error_NoConnection_NoInstall
+
+			fi
+
+		fi
+
+		#Koel
+		INSTALLING_INDEX=143
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Banner_Installing
+
+			INSTALL_URL_ADDRESS='https://github.com/phanan/koel/archive/v3.6.2.zip'
+
+			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
+
+			#Install
+			if (( $? == 0 )); then
+
+				AGI python
+
+				wget "$INSTALL_URL_ADDRESS" -O package.zip
+				unzip -o package.zip
+				rm package.zip
+				mv koel-* /var/www/koel
+
+				php -r "readfile('https://getcomposer.org/installer');" > composer-setup.php
+				php composer-setup.php
+				php -r "unlink('composer-setup.php');"
+
+				mv composer.phar /usr/local/bin/composer
+
+				cd /var/www/koel
+				npm install yarn -g --unsafe-perm
+				composer install
+				cd "$HOME"
+
+			else
+
+				Error_NoConnection_NoInstall
+
+			fi
+
+		fi
+
+		#Sonarr
+		INSTALLING_INDEX=144
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Banner_Installing
+
+			apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
+			echo -e "deb http://download.mono-project.com/repo/debian jessie main" > /etc/apt/sources.list.d/mono-xamarin.list
+
+			apt-key adv --keyserver keyserver.ubuntu.com --recv-keys FDA5DFFC
+			if (( $HW_ARCH == 3 )); then
+
+				echo -e "deb [arch=armhf] https://apt.sonarr.tv/ master main" > /etc/apt/sources.list.d/sonarr.list
+
+			else
+
+				echo -e "deb https://apt.sonarr.tv/ master main" > /etc/apt/sources.list.d/sonarr.list
+
+			fi
+			apt-get update
+
+			AGI nzbdrone
+
+		fi
+
+		#Radarr
+		INSTALLING_INDEX=145
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Banner_Installing
+
+			INSTALL_URL_ADDRESS='https://api.github.com/repos/Radarr/Radarr/releases'
+
+			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
+
+			#Install
+			if (( $? == 0 )); then
+
+				apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
+				echo -e "deb http://download.mono-project.com/repo/debian jessie main" > /etc/apt/sources.list.d/mono-xamarin.list
+
+				apt-get update
+
+				AGI mono-devel mediainfo sqlite3 libmono-cil-dev
+
+				wget $( curl -s "$INSTALL_URL_ADDRESS" | grep linux.tar.gz | grep browser_download_url | head -1 | cut -d \" -f 4 ) -O package.tar
+				tar -xf package.tar -C /opt/
+				rm package.tar
+
+			else
+
+				Error_NoConnection_NoInstall
+
+			fi
+
+		fi
+
+		#PlexPy
+		INSTALLING_INDEX=146
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Banner_Installing
+
+			INSTALL_URL_ADDRESS='https://github.com/JonnyWong16/plexpy.git'
+
+			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
+
+			#Install
+			if (( $? == 0 )); then
+
+				AGI python
+
+				git clone --depth=1 "$INSTALL_URL_ADDRESS"
+
+				mv plexpy /opt/
+
+			else
+
+				Error_NoConnection_NoInstall
+
+			fi
+
+		fi
+
+		#Jackett
+		INSTALLING_INDEX=147
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Banner_Installing
+
+			INSTALL_URL_ADDRESS='https://api.github.com/repos/Jackett/Jackett/releases'
+
+			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
+
+			#Install
+			if (( $? == 0 )); then
+
+				apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF
+				echo -e "deb http://download.mono-project.com/repo/debian jessie main" > /etc/apt/sources.list.d/mono-xamarin.list
+
+				apt-get update
+
+				AGI mono-devel
+
+				wget $( curl -s "$INSTALL_URL_ADDRESS" | grep Jackett.Binaries.Mono.tar.gz | grep browser_download_url | head -1 | cut -d \" -f 4 ) -O package.tar
+				tar -xvf package.tar
+				rm package.tar
+
+				mkdir /opt/jackett
+
+				mv Jackett/* /opt/jackett
+
+				rm -R Jackett
+
+			else
+
+				Error_NoConnection_NoInstall
+
+			fi
+
+		fi
+
+		#JRiver
+		INSTALLING_INDEX=148
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Banner_Installing
+
+			INSTALL_URL_ADDRESS='http://dist.jriver.com/latest/mediacenter/mediacenter22native.list'
+
+			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
+
+			#Install
+			if (( $? == 0 )); then
+
+				wget -q -O - http://dist.jriver.com/mediacenter@jriver.com.gpg.key | apt-key add -
+				wget "$INSTALL_URL_ADDRESS" -O /etc/apt/sources.list.d/mediacenter22.list
+
+				apt-get update
+
+				AGI mediacenter22
+
+			else
+
+				Error_NoConnection_NoInstall
+
+			fi
+
+		fi
+
+		#NZBget
+		INSTALLING_INDEX=149
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Banner_Installing
+
+			INSTALL_URL_ADDRESS='https://nzbget.net'
+
+			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
+
+			#Install
+			if (( $? == 0 )); then
+
+				INSTALL_URL_ADDRESS+='/download/nzbget-latest-bin-linux.run'
+
+				wget "$INSTALL_URL_ADDRESS"  -O package.run
+				mkdir -p "$FP_DIETPI_USERDATA_DIRECTORY"/nzbget
+				sh package.run --destdir "$FP_DIETPI_USERDATA_DIRECTORY"/nzbget
+				rm package.run
 
 			else
 
@@ -5453,7 +6569,7 @@ _EOF_
 
 			Banner_Installing
 
-			AGI alsa-base alsa-utils
+			AGI alsa-utils
 
 			#Apply soundcard
 			local soundcard=$(cat /DietPi/dietpi.txt | grep -m1 'soundcard=' | sed 's/.*=//')
@@ -5536,7 +6652,6 @@ _EOF_
 			#Pine64
 			elif (( $HW_MODEL >= 40 && $HW_MODEL < 50 )); then
 
-
 				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/libump_1-1_arm64.deb'
 				/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
 
@@ -5565,6 +6680,18 @@ _EOF_
 					Error_NoConnection_NoInstall
 
 				fi
+
+			#Asus TB
+			# elif (( $HW_MODEL == 100 )); then
+
+				# cat << _EOF_ > /etc/X11/xorg.conf
+# Section "Device"
+    # Identifier  "Rockchip Graphics"
+    # Driver      "modesetting"
+    # Option      "AccelMethod"    "glamor"
+    # Option      "DRI"            "2"
+# EndSection
+# _EOF_
 
 			fi
 
@@ -5616,6 +6743,14 @@ _EOF_
 
 			Banner_Installing
 			AGI vim-tiny
+
+		fi
+
+		INSTALLING_INDEX=127
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Banner_Installing
+			AGI neovim
 
 		fi
 
@@ -5810,43 +6945,27 @@ _EOF_
 
 			Banner_Installing
 
-			#RPi v1 armv6, broken packages in multimedia repo. https://github.com/Fourdee/DietPi/issues/84#issuecomment-151201361
-			if (( $HW_MODEL < 2 )); then
+			#RPi + OpenMAX HW Encoding: https://github.com/Fourdee/DietPi/issues/869
+			if (( $HW_MODEL < 10 )); then
 
-				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/ffmpeg_2.7.2-1_armhf-v6.deb'
-				wget "$INSTALL_URL_ADDRESS" -O package.deb
-				dpkg -i package.deb
-				rm package.deb
+				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/rpi/ffmpeg_rpi.7z'
 
-				INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/all/fdk-aac_0.1.4_armhf-v6.deb'
-				wget "$INSTALL_URL_ADDRESS" -O package.deb
-				dpkg -i package.deb
-				rm package.deb
+				/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
+				if (( $? == 0 )); then
 
-				#Install pre-reqs
-				AGI libogg0 libvorbisenc2 libtheora0 libspeex1 libopencore-amrwb0 libopencore-amrnb0 libass5 libmp3lame0
+					wget "$INSTALL_URL_ADDRESS" -O package.7z
+					7z x -y package.7z -offmpeg_rpi
+					dpkg -i ffmpeg_rpi/*.deb
+					rm -R ffmpeg_rpi
+					rm package.7z
 
-			#rpi 2/3
-			elif (( $HW_MODEL == 2 )) || (( $HW_MODEL == 3 )); then
+				else
 
-				#Add Deb Multimedia repo for ffmpeg
-				if [ ! -f /etc/apt/sources.list.d/debmultimedia.list ]; then
-
-					echo -e "deb http://www.deb-multimedia.org jessie main non-free" > /etc/apt/sources.list.d/debmultimedia.list
-					apt-get update
-					AGI deb-multimedia-keyring
-					apt-get update
-
-					AGI ffmpeg
-
-					#Done. Remove deb http://www.deb-multimedia.org from apt sources
-					# - When installing Kodi, apt uses the packages from deb http://www.deb-multimedia.org, rather than Raspbian.
-					rm /etc/apt/sources.list.d/debmultimedia.list
-					apt-get update
+					Error_NoConnection_NoInstall
 
 				fi
 
-			#Jessie (now available from backports).
+			#Everything else
 			else
 
 				AGI ffmpeg
@@ -5904,6 +7023,61 @@ _EOF_
 
 				rm node_install.sh
 
+
+			else
+
+				Error_NoConnection_NoInstall
+
+			fi
+
+		fi
+
+		INSTALLING_INDEX=130
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Banner_Installing
+
+			INSTALL_URL_ADDRESS='https://bootstrap.pypa.io/get-pip.py'
+			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
+
+			if (( $? == 0 )); then
+
+				# - Preqs
+				AGI python python-dev
+
+				wget "$INSTALL_URL_ADDRESS" -O install.py
+				python ./install.py
+				rm install.py
+
+				AGI python-pip
+
+			else
+
+				Error_NoConnection_NoInstall
+
+			fi
+
+		fi
+
+		#SDL2
+		INSTALLING_INDEX=140
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Banner_Installing
+
+			INSTALL_URL_ADDRESS='http://dietpi.com/downloads/binaries/rpi/sdl2_rpi.7z'
+			/DietPi/dietpi/func/check_connection "$INSTALL_URL_ADDRESS"
+
+			if (( $? == 0 )); then
+
+				#AGI libxss1 #if using SDL2+rpi5
+
+				wget "$INSTALL_URL_ADDRESS" -O package.7z
+				7z x -y package.7z -osdl2_rpi
+				rm package.7z
+
+				dpkg -i sdl2_rpi/no_opengl_x11/*.deb
+				rm -R sdl2_rpi
 
 			else
 
@@ -6070,7 +7244,15 @@ _EOF_
 		chown -R www-data:www-data /var/www
 		chmod -R 775 /var/www
 
+		# - O!MPD, requires write permissions
+		chmod -R 777 /var/www/ompd/tmp #(required for database update)
+		chmod -R 777 /var/www/ompd/stream #(required for streaming files)
+		chmod -R 777 /var/www/ompd/cache #(required for downloading files)
+
 		#Apply non-root permissions for files and folders in FP_DIETPI_USERDATA_DIRECTORY
+
+		# - dietpi user
+		chown -R dietpi:dietpi "$FP_DIETPI_USERDATA_DIRECTORY"
 		chmod -R 775 "$FP_DIETPI_USERDATA_DIRECTORY"
 
 		# - MySQL data store
@@ -6078,13 +7260,14 @@ _EOF_
 		chmod -R 770 "$FP_DIETPI_USERDATA_DIRECTORY"/mysql
 
 		chown -R mineos:mineos "$FP_DIETPI_USERDATA_DIRECTORY"/mineos/serverdata
+		chown -R urbackup:urbackup "$FP_DIETPI_USERDATA_DIRECTORY"/urbackup
+		#chown -R couchpotato:couchpotato "$FP_DIETPI_USERDATA_DIRECTORY"/couchpotato
 
 		chown -R www-data:www-data "$FP_DIETPI_USERDATA_DIRECTORY"/dietpicam
-
-		chown -R urbackup:urbackup "$FP_DIETPI_USERDATA_DIRECTORY"/urbackup
 		chown -R www-data:www-data "$FP_DIETPI_USERDATA_DIRECTORY"/pydio_data
 		chown -R www-data:www-data "$FP_DIETPI_USERDATA_DIRECTORY"/owncloud_data
 		chown -R www-data:www-data "$FP_DIETPI_USERDATA_DIRECTORY"/nextcloud_data
+
 
 	}
 
@@ -6375,16 +7558,7 @@ apc.ttl=$target_apc_ttl
 _EOF_
 
 			#APC info page
-			if (( $DISTRO == 3 )); then
-
-				cp /usr/share/doc/php5-apcu/apc.php /var/www/apc.php
-
-			# - PHP7+ - File does not exist
-			else
-
-				wget http://dietpi.com/downloads/conf/apc.php -O /var/www/apc.php
-
-			fi
+			wget https://github.com/krakjoe/apcu/raw/master/apc.php -O /var/www/apc.php
 
 			#Array to store known locations of php.ini, so we can apply same settings to all of them.
 			local afp_php_ini=(
@@ -6468,6 +7642,13 @@ _EOF_
 
 				# - copy
 				cp -R /var/lib/mysql/* "$FP_DIETPI_USERDATA_DIRECTORY"/mysql/
+				if (( $? != 0 )); then
+
+					/DietPi/dietpi/func/dietpi-notify 1 "Moving of MySQL data store failed to $FP_DIETPI_USERDATA_DIRECTORY/mysql. DietPi-Software will now exit"
+					Exit_Destroy
+
+				fi
+
 				rm -R /var/lib/mysql
 
 				# - Symlink
@@ -6513,6 +7694,32 @@ _EOF_
 			# - service
 			cp /DietPi/dietpi/conf/openbazaar-server.service /etc/dietpi/dietpi-software/services/openbazaar-server.service
 			chmod +x /etc/dietpi/dietpi-software/services/openbazaar-server.service
+
+		fi
+
+		#YaCy
+		INSTALLING_INDEX=133
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			chmod +x -R /etc/yacy
+
+			cat << _EOF_ > /etc/systemd/system/yacy.service
+[Unit]
+Description=DietPi YaCy Service
+
+[Service]
+Type=simple
+RemainAfterExit=yes
+ExecStart=/bin/bash -c '/etc/yacy/startYACY.sh'
+ExecStop=/bin/bash -c '/etc/yacy/stopYACY.sh'
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+			systemctl daemon-reload
+
+			#	Create admin login account:
+			/etc/yacy/bin/passwd.sh "$GLOBAL_PW"
 
 		fi
 
@@ -6569,7 +7776,6 @@ _EOF_
 			fi
 
 		fi
-
 
 		#NextCloud
 		INSTALLING_INDEX=114
@@ -6644,7 +7850,6 @@ StandardOutput=tty
 [Install]
 WantedBy=multi-user.target
 _EOF_
-			systemctl enable transmission-daemon.service
 
 			cat << _EOF_ > /etc/transmission-daemon/settings.json
 {
@@ -6661,7 +7866,7 @@ _EOF_
     "blocklist-url": "http://www.example.com/blocklist",
     "cache-size-mb": 48,
     "dht-enabled": true,
-    "download-dir": "/mnt/dietpi_userdata/downloads",
+    "download-dir": "$FP_DIETPI_USERDATA_DIRECTORY/downloads",
     "download-limit": 100,
     "download-limit-enabled": false,
     "download-queue-enabled": true,
@@ -6669,7 +7874,7 @@ _EOF_
     "encryption": 2,
     "idle-seeding-limit": 1,
     "idle-seeding-limit-enabled": true,
-    "incomplete-dir": "/mnt/dietpi_userdata/bt-inprogress",
+    "incomplete-dir": "$FP_DIETPI_USERDATA_DIRECTORY/bt-inprogress",
     "incomplete-dir-enabled": false,
     "lpd-enabled": false,
     "max-peers-global": 8,
@@ -6737,56 +7942,9 @@ _EOF_
 
 		fi
 
-		# Proftpd
-		INSTALLING_INDEX=94
+		#MPD
+		INSTALLING_INDEX=128
 		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
-
-			sed -i "/root/c\#root" /etc/ftpusers
-			cp /DietPi/dietpi/conf/proftpd.conf /etc/proftpd/proftpd.conf
-			sed -i "/DefaultRoot /c\DefaultRoot $FP_DIETPI_USERDATA_DIRECTORY" /etc/proftpd/proftpd.conf
-
-		fi
-
-		#Samba Server
-		INSTALLING_INDEX=96
-		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
-
-			echo -e "dietpi\ndietpi" | smbpasswd -s -a root
-			cp /DietPi/dietpi/conf/smb.conf /etc/samba/smb.conf
-
-			sed -i "/path = /c\path = $FP_DIETPI_USERDATA_DIRECTORY" /etc/samba/smb.conf
-
-		fi
-
-		#vsFTPD
-		INSTALLING_INDEX=95
-		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
-
-			sed -i '/root/c\#root' /etc/ftpusers
-
-			cp /DietPi/dietpi/conf/vsftpd.conf /etc/vsftpd.conf
-			sed -i "/^local_root=/c\local_root=$FP_DIETPI_USERDATA_DIRECTORY" /etc/vsftpd.conf
-
-		fi
-
-		#NFS_SERVER
-		INSTALLING_INDEX=109
-		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
-
-			cat << _EOF_ > /etc/exports
-$FP_DIETPI_USERDATA_DIRECTORY *(rw,async,no_root_squash,fsid=0,crossmnt,no_subtree_check)
-_EOF_
-
-		fi
-
-		#HIFI
-		INSTALLING_INDEX=32
-		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
-
-			#YMPD service
-			cp /DietPi/dietpi/conf/ympd_init /etc/init.d/ympd
-			chmod +x /etc/init.d/ympd
-			update-rc.d ympd defaults
 
 			#MPD service/confs
 			cat << _EOF_ > /etc/default/mpd
@@ -6856,6 +8014,59 @@ _EOF_
 
 			#Grab our test music for the user.
 			Download_Test_Media
+
+		fi
+
+		# Proftpd
+		INSTALLING_INDEX=94
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			sed -i "/root/c\#root" /etc/ftpusers
+			cp /DietPi/dietpi/conf/proftpd.conf /etc/proftpd/proftpd.conf
+			sed -i "/DefaultRoot /c\DefaultRoot $FP_DIETPI_USERDATA_DIRECTORY" /etc/proftpd/proftpd.conf
+
+		fi
+
+		#Samba Server
+		INSTALLING_INDEX=96
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			echo -e "dietpi\ndietpi" | smbpasswd -s -a root
+			cp /DietPi/dietpi/conf/smb.conf /etc/samba/smb.conf
+
+			sed -i "/path = /c\path = $FP_DIETPI_USERDATA_DIRECTORY" /etc/samba/smb.conf
+
+		fi
+
+		#vsFTPD
+		INSTALLING_INDEX=95
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			sed -i '/root/c\#root' /etc/ftpusers
+
+			cp /DietPi/dietpi/conf/vsftpd.conf /etc/vsftpd.conf
+			sed -i "/^local_root=/c\local_root=$FP_DIETPI_USERDATA_DIRECTORY" /etc/vsftpd.conf
+
+		fi
+
+		#NFS_SERVER
+		INSTALLING_INDEX=109
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			cat << _EOF_ > /etc/exports
+$FP_DIETPI_USERDATA_DIRECTORY *(rw,async,no_root_squash,fsid=0,crossmnt,no_subtree_check)
+_EOF_
+
+		fi
+
+		#YMPD
+		INSTALLING_INDEX=32
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			#YMPD service
+			cp /DietPi/dietpi/conf/ympd_init /etc/init.d/ympd
+			chmod +x /etc/init.d/ympd
+			update-rc.d ympd defaults
 
 		fi
 
@@ -6977,7 +8188,6 @@ _EOF_
 			fi
 
 		fi
-
 
 		#Mopidy
 		INSTALLING_INDEX=118
@@ -7112,118 +8322,159 @@ _EOF_
 
 		fi
 
-		#uae4arm
+		#amiberry
 		INSTALLING_INDEX=108
 		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
 
 			#Allow binary execution
-			chmod +x /etc/uae4arm-rpi/uae4arm*
+			chmod -R +x /etc/amiberry
 
-			#Create userdata/rom directories and symlink from /etc/uae4arm-rpi/
-			mkdir -p "$FP_DIETPI_USERDATA_DIRECTORY"/uae4arm-rpi
+			#Create userdata/rom directories and symlink from /etc/amiberry/
+			mkdir -p "$FP_DIETPI_USERDATA_DIRECTORY"/amiberry
 
 			#Copy default configs, then setup symlinks from Uae4ARM folders to userdata.
 			# - Conf
-			cp -R /etc/uae4arm-rpi/conf "$FP_DIETPI_USERDATA_DIRECTORY"/uae4arm-rpi/
-			rm -R /etc/uae4arm-rpi/conf &> /dev/null
-			ln -sf "$FP_DIETPI_USERDATA_DIRECTORY"/uae4arm-rpi/conf /etc/uae4arm-rpi/conf
+			cp -R /etc/amiberry/conf "$FP_DIETPI_USERDATA_DIRECTORY"/amiberry/
+			rm -R /etc/amiberry/conf &> /dev/null
+			ln -sf "$FP_DIETPI_USERDATA_DIRECTORY"/amiberry/conf /etc/amiberry/conf
 
 			# - Disks
-			rm -R /etc/uae4arm-rpi/disks &> /dev/null
-			mkdir -p "$FP_DIETPI_USERDATA_DIRECTORY"/uae4arm-rpi/disks
-			ln -sf "$FP_DIETPI_USERDATA_DIRECTORY"/uae4arm-rpi/disks /etc/uae4arm-rpi/disks
+			rm -R /etc/amiberry/disks &> /dev/null
+			mkdir -p "$FP_DIETPI_USERDATA_DIRECTORY"/amiberry/disks
+			ln -sf "$FP_DIETPI_USERDATA_DIRECTORY"/amiberry/disks /etc/amiberry/disks
 
 			# - floppy_images
-			rm -R /etc/uae4arm-rpi/floppy_images &> /dev/null
-			mkdir -p "$FP_DIETPI_USERDATA_DIRECTORY"/uae4arm-rpi/floppy_images
-			ln -sf "$FP_DIETPI_USERDATA_DIRECTORY"/uae4arm-rpi/floppy_images /etc/uae4arm-rpi/floppy_images
-			cat << _EOF_ > "$FP_DIETPI_USERDATA_DIRECTORY"/uae4arm-rpi/floppy_images/dir.txt
+			rm -R /etc/amiberry/floppy_images &> /dev/null
+			mkdir -p "$FP_DIETPI_USERDATA_DIRECTORY"/amiberry/floppy_images
+			ln -sf "$FP_DIETPI_USERDATA_DIRECTORY"/amiberry/floppy_images /etc/amiberry/floppy_images
+			cat << _EOF_ > "$FP_DIETPI_USERDATA_DIRECTORY"/amiberry/floppy_images/dir.txt
 Put your Amiga floopy images (*.adf) in this directory.
 _EOF_
 
 			# - HDF
-			rm -R /etc/uae4arm-rpi/hdf &> /dev/null
-			mkdir -p "$FP_DIETPI_USERDATA_DIRECTORY"/uae4arm-rpi/hdf
-			ln -sf "$FP_DIETPI_USERDATA_DIRECTORY"/uae4arm-rpi/hdf /etc/uae4arm-rpi/hdf
+			rm -R /etc/amiberry/hdf &> /dev/null
+			mkdir -p "$FP_DIETPI_USERDATA_DIRECTORY"/amiberry/hdf
+			ln -sf "$FP_DIETPI_USERDATA_DIRECTORY"/amiberry/hdf /etc/amiberry/hdf
 
 			# - Kickstarts
-			rm -R /etc/uae4arm-rpi/kickstarts &> /dev/null
-			mkdir -p "$FP_DIETPI_USERDATA_DIRECTORY"/uae4arm-rpi/kickstarts
-			ln -sf "$FP_DIETPI_USERDATA_DIRECTORY"/uae4arm-rpi/kickstarts /etc/uae4arm-rpi/kickstarts
-			cat << _EOF_ > "$FP_DIETPI_USERDATA_DIRECTORY"/uae4arm-rpi/kickstarts/dir.txt
+			rm -R /etc/amiberry/kickstarts &> /dev/null
+			mkdir -p "$FP_DIETPI_USERDATA_DIRECTORY"/amiberry/kickstarts
+			ln -sf "$FP_DIETPI_USERDATA_DIRECTORY"/amiberry/kickstarts /etc/amiberry/kickstarts
+			cat << _EOF_ > "$FP_DIETPI_USERDATA_DIRECTORY"/amiberry/kickstarts/dir.txt
 Put your Kickstart Roms (*.rom) in this directory.
 They should be named accordingly depending on version: kick12.rom , kick13.rom , kick20.rom, kick31.rom
 _EOF_
 
 			# - Savestates
-			rm -R /etc/uae4arm-rpi/savestates &> /dev/null
-			mkdir -p "$FP_DIETPI_USERDATA_DIRECTORY"/uae4arm-rpi/savestates
-			ln -sf "$FP_DIETPI_USERDATA_DIRECTORY"/uae4arm-rpi/savestates /etc/uae4arm-rpi/savestates
-			cat << _EOF_ > "$FP_DIETPI_USERDATA_DIRECTORY"/uae4arm-rpi/savestates/dir.txt
+			rm -R /etc/amiberry/savestates &> /dev/null
+			mkdir -p "$FP_DIETPI_USERDATA_DIRECTORY"/amiberry/savestates
+			ln -sf "$FP_DIETPI_USERDATA_DIRECTORY"/amiberry/savestates /etc/amiberry/savestates
+			cat << _EOF_ > "$FP_DIETPI_USERDATA_DIRECTORY"/amiberry/savestates/dir.txt
 Saved states will be stored here.
 _EOF_
 
 			# - Screenshots
-			rm -R /etc/uae4arm-rpi/screenshots &> /dev/null
-			mkdir -p "$FP_DIETPI_USERDATA_DIRECTORY"/uae4arm-rpi/screenshots
-			ln -sf "$FP_DIETPI_USERDATA_DIRECTORY"/uae4arm-rpi/screenshots /etc/uae4arm-rpi/screenshots
-			cat << _EOF_ > "$FP_DIETPI_USERDATA_DIRECTORY"/uae4arm-rpi/screenshots/dir.txt
+			rm -R /etc/amiberry/screenshots &> /dev/null
+			mkdir -p "$FP_DIETPI_USERDATA_DIRECTORY"/amiberry/screenshots
+			ln -sf "$FP_DIETPI_USERDATA_DIRECTORY"/amiberry/screenshots /etc/amiberry/screenshots
+			cat << _EOF_ > "$FP_DIETPI_USERDATA_DIRECTORY"/amiberry/screenshots/dir.txt
 Screenshots will be stored here.
 _EOF_
 
 
 			#Uae4arm does not support browsing symlinks (https://github.com/Fourdee/DietPi/issues/474#issuecomment-242973839)
 			#	So we need to change config file default paths to actual userdata location:
-			local fp_userdata_actual=$(readlink /mnt/dietpi_userdata) # Only returns a value if symlink exists (eg: off SDcard)
+			local fp_userdata_actual=$(readlink "$FP_DIETPI_USERDATA_DIRECTORY") # Only returns a value if symlink exists (eg: off SDcard)
 			if [ -n "$fp_userdata_actual" ]; then
 
-				sed -i "s:$FP_DIETPI_USERDATA_DIRECTORY:$fp_userdata_actual:g" "$FP_DIETPI_USERDATA_DIRECTORY"/uae4arm-rpi/conf/adfdir.conf
-				sed -i "s:$FP_DIETPI_USERDATA_DIRECTORY:$fp_userdata_actual:g" "$FP_DIETPI_USERDATA_DIRECTORY"/uae4arm-rpi/conf/autostart.uae
+				sed -i "s:$FP_DIETPI_USERDATA_DIRECTORY:$fp_userdata_actual:g" "$FP_DIETPI_USERDATA_DIRECTORY"/amiberry/conf/adfdir.conf
+				sed -i "s:$FP_DIETPI_USERDATA_DIRECTORY:$fp_userdata_actual:g" "$FP_DIETPI_USERDATA_DIRECTORY"/amiberry/conf/autostart.uae
 
 			fi
 
-			#Symlink HW specific binary for this system to /etc/uae4arm-rpi/uae4arm-rpi
-			local uae_filename=''
+			#Symlink HW specific binary for this system to /etc/amiberry/amiberry
+			local amiberry_filename='amiberry-rpi'
 
 			# - RPi 3
 			if (( $HW_MODEL == 3 )); then
 
-				uae_filename='uae4arm-rpi3'
+				amiberry_filename+='3'
 
 			# - RPi 2
 			elif (( $HW_MODEL == 2 )); then
 
-				uae_filename='uae4arm-rpi2'
+				amiberry_filename+='2'
 
 			# - Assume RPi 1 (ARMv6)
 			else
 
-				uae_filename='uae4arm-rpi1'
+				amiberry_filename+='1'
 
 			fi
 
-			ln -sf /etc/uae4arm-rpi/"$uae_filename" /etc/uae4arm-rpi/uae4arm-rpi
+			ln -sf /etc/amiberry/"$amiberry_filename" /etc/amiberry/amiberry
 
-			#service
-			cp /DietPi/dietpi/conf/uae4arm-rpi.service /etc/systemd/system/uae4arm-rpi.service
+			# + SDL2
+			amiberry_filename+='-sdl2'
+			ln -sf /etc/amiberry/"$amiberry_filename" /etc/amiberry/amiberry-sdl2
 
-			#run script | checks and runs xinit as needed:
-			cat << _EOF_ > /etc/uae4arm-rpi/uae4arm-rpi_run.sh
+			#service SDL1
+			cat << _EOF_ > /etc/systemd/system/amiberry.service
+[Unit]
+Description=AmiBerry Amiga Emulator
+DefaultDependencies=no
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/etc/amiberry
+ExecStart=/bin/bash -c ./amiberry_run.sh
+
+[Install]
+WantedBy=local-fs.target
+_EOF_
+			systemctl daemon-reload
+
+			cat << _EOF_ > /etc/amiberry/amiberry_run.sh
 #!/bin/bash
+if (( \$(ps aux | grep -ci -m1 '[X]11') )); then
 
-#From Desktop
-if (( \$( ps aux | grep -ci -m1 '/usr/bin/[X]' ) == 1 )); then
-
-    ./uae4arm-rpi -f conf/autostart.uae
+./amiberry -f conf/autostart.uae
 
 else
 
-    xinit ./uae4arm-rpi -f conf/autostart.uae
+xinit ./amiberry -f conf/autostart.uae
 
 fi
 _EOF_
 
-			chmod +x /etc/uae4arm-rpi/uae4arm-rpi_run.sh
+			chmod +x /etc/amiberry/amiberry_run.sh
+
+			#service SDL2
+			cat << _EOF_ > /etc/systemd/system/amiberry-sdl2.service
+[Unit]
+Description=AmiBerry Amiga Emulator
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/etc/amiberry
+ExecStart=/bin/bash -c ./amiberry_run_sdl2.sh
+
+[Install]
+WantedBy=local-fs.target
+_EOF_
+			systemctl daemon-reload
+
+			#DEBUG
+			#systemctl restart amiberry-sdl2
+
+			cat << _EOF_ > /etc/amiberry/amiberry_run_sdl2.sh
+#!/bin/bash
+xinit ./amiberry-sdl2 -f conf/autostart.uae
+_EOF_
+
+			chmod +x /etc/amiberry/amiberry_run_sdl2.sh
 
 		fi
 
@@ -7741,27 +8992,27 @@ _EOF_
 
 		#VNC4SERVER / RealVNC
 		INSTALLING_INDEX=28
-		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 ||
-			${aSOFTWARE_INSTALL_STATE[120]} == 1 )); then
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} >= 1 ||
+			${aSOFTWARE_INSTALL_STATE[120]} >= 1 )); then
 
 			local cmd_launch_desktop=''
 			#DESKTOP_LXDE
-			if (( ${aSOFTWARE_INSTALL_STATE[23]} == 1 )); then
+			if (( ${aSOFTWARE_INSTALL_STATE[23]} >= 1 )); then
 
 				cmd_launch_desktop='/usr/bin/lxsession -s LXDE &'
 
 			#DESKTOP_MATE
-			elif (( ${aSOFTWARE_INSTALL_STATE[24]} == 1 )); then
+			elif (( ${aSOFTWARE_INSTALL_STATE[24]} >= 1 )); then
 
 				cmd_launch_desktop='x-window-manager &'
 
 			#DESKTOP_GNUSTEP
-			elif (( ${aSOFTWARE_INSTALL_STATE[26]} == 1 )); then
+			elif (( ${aSOFTWARE_INSTALL_STATE[26]} >= 1 )); then
 
 				cmd_launch_desktop='x-window-manager &'
 
 			#DESKTOP_XFCE
-			elif (( ${aSOFTWARE_INSTALL_STATE[25]} == 1 )); then
+			elif (( ${aSOFTWARE_INSTALL_STATE[25]} >= 1 )); then
 
 				cmd_launch_desktop='/usr/bin/xfce4-session &'
 
@@ -7958,7 +9209,7 @@ _EOF_
 			cat /etc/openvpn/easy-rsa/keys/DietPi_OpenVPN_Client.key >> /etc/openvpn/easy-rsa/keys/DietPi_OpenVPN_Client.ovpn
 			echo '</key>' >> /etc/openvpn/easy-rsa/keys/DietPi_OpenVPN_Client.ovpn
 
-			#Copy client file to DietPi fileserver locations (/root or /mnt/usb_1)
+			#Copy client file to userdata location
 			cp /etc/openvpn/easy-rsa/keys/DietPi_OpenVPN_Client.ovpn "$FP_DIETPI_USERDATA_DIRECTORY"/
 			# - and /boot partition
 			cp /etc/openvpn/easy-rsa/keys/DietPi_OpenVPN_Client.ovpn /boot/
@@ -8121,12 +9372,29 @@ _EOF_
 		INSTALLING_INDEX=37
 		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
 
-			#Reduce min volume scale threshold (prevents hissing on low end soundcards eg:rpi)
-			sed -i '/volume_range_db = /c\volume_range_db = 40;' /etc/shairport-sync.conf
+			#Enable SOXR by default:
+			cat << _EOF_ >  /usr/local/etc/shairport-sync.conf
+general =
+{
+  name = "%H";
+  interpolation = "soxr";
+};
 
-			#set service user to root (mainly for for arm64, but no harm in doing it for all installs)
-			sed -i '/^User=/d' /lib/systemd/system/shairport-sync.service &> /dev/null
-			sed -i '/^Group=/d' /lib/systemd/system/shairport-sync.service &> /dev/null
+metadata =
+{
+	enabled = "yes";
+	include_cover_art = "no";
+	pipe_name = "/tmp/shairport-sync-metadata";
+	pipe_timeout = 5000;
+	socket_address = "226.0.0.1";
+	socket_port = 5555;
+	socket_msglength = 65000;
+};
+_EOF_
+
+			#Create shairport user
+			groupadd -r shairport-sync &> /dev/null
+			useradd -r -M -g shairport-sync -s /usr/bin/nologin -G audio shairport-sync &> /dev/null
 
 		fi
 
@@ -8421,7 +9689,7 @@ _EOF_
 			#For all ARM devices:
 			# - en_US.UTF8 must be installed and the default locale on system. This is for SBC installs using dev2day repo: https://github.com/Fourdee/DietPi/issues/116#issuecomment-222195911
 			if (( $USER_INPUTS &&
-				$HW_ARCH < 20 && ! $(locale | grep -ci -m1 'en_US.UTF-8') )); then
+				$HW_ARCH < 10 && ! $(locale | grep -ci -m1 'en_US.UTF-8') )); then
 
 				sed -i '/en_US.UTF-8 UTF-8/c\en_US.UTF-8 UTF-8' /etc/locale.gen
 				locale-gen
@@ -8904,6 +10172,26 @@ _EOF_
 
 		fi
 
+		#Aria2
+		INSTALLING_INDEX=132
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			cat << _EOF_ > /etc/systemd/system/aria2.service
+[Unit]
+Description=DietPi Aria2
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/aria2c --enable-rpc --rpc-listen-all --rpc-secret=$GLOBAL_PW --dir=$FP_DIETPI_USERDATA_DIRECTORY/$FOLDER_DOWNLOADS
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+
+			systemctl daemon-reload
+
+		fi
+
 		#SYNCTHING
 		INSTALLING_INDEX=50
 		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
@@ -9033,30 +10321,78 @@ _EOF_
 
 		fi
 
+		#TONIDO
+		INSTALLING_INDEX=134
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			#service
+			cat << _EOF_ > /etc/systemd/system/tonido.service
+[Unit]
+Description=Tonido - DietPi
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/etc/tonido
+ExecStart=/bin/bash -c 'export LD_LIBRARY_PATH=/etc/tonido; export TONIDODIR=/etc/tonido; ./tonidoconsole'
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+
+			# - userdirs
+			mkdir -p "$FP_DIETPI_USERDATA_DIRECTORY"/tonido/sync
+			mkdir -p "$FP_DIETPI_USERDATA_DIRECTORY"/tonido/syncdata
+
+			#	symlink
+			cp -R "$HOME"/tonido "$FP_DIETPI_USERDATA_DIRECTORY"/
+			rm -R "$HOME"/tonido
+			ln -sf "$FP_DIETPI_USERDATA_DIRECTORY"/tonido "$HOME"/tonido
+			ln -sf "$FP_DIETPI_USERDATA_DIRECTORY"/tonido/sync "$HOME"/TonidoSync
+			ln -sf "$FP_DIETPI_USERDATA_DIRECTORY"/tonido/syncdata "$HOME"/TonidoSyncData
+
+			# - armv7 switch
+			if (( $HW_ARCH == 2 )); then
+
+				sed -i 's/armv6l/armv7l/' /etc/tonido/manifest.xml
+				sed -i 's/armv6l/armv7l/' /etc/tonido/plugins/*/manifest.xml
+
+			fi
+
+		fi
+
 		#Chromium
 		INSTALLING_INDEX=113
 		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
 
+			#Allow root, start maximized and disable sandbox under root (blank screen without)
+			local export_options="export CHROMIUM_FLAGS=\"\$CHROMIUM_FLAGS --no-sandbox --temp-profile --start-maximized --user-data-dir "
+			mkdir -p /etc/chromium.d
+
 			#RPi
 			if (( $HW_MODEL < 10 )); then
 
-				#OpenGL
+				#	OpenGL
 				if (( $HW_MODEL >= 2 )); then
 
-					/DietPi/dietpi/func/dietpi-set_hardware rpi-opengl enable
+					#Hangs xinit: https://github.com/Fourdee/DietPi/issues/834
+					#/DietPi/dietpi/func/dietpi-set_hardware rpi-opengl enable
+					echo 0
 
 				fi
-
-				# - Allow root and disable sandbox (blank screen without)
-				sed -i '/Exec=/c\Exec=chromium --no-sandbox --user-data-dir --temp-profile' /usr/share/applications/chromium.desktop
 
 			#GLES
 			else
 
-				# - Allow root, egl and disable sandbox (blank screen without)
-				sed -i '/Exec=/c\Exec=chromium --no-sandbox --use-gl=egl --user-data-dir --temp-profile' /usr/share/applications/chromium.desktop
+				export_options+='--use-gl=egl'
 
 			fi
+
+			export_options+="\""
+
+			cat << _EOF_ > /etc/chromium.d/custom_flags
+$export_options
+_EOF_
 
 			#Symlink to desktop
 			ln -sf /usr/share/applications/chromium.desktop "$HOME"/Desktop/chromium.desktop
@@ -9071,6 +10407,415 @@ _EOF_
 
 		fi
 
+		#O!MPD
+		INSTALLING_INDEX=129
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			sed -i "/'mysqli_user'/c \$cfg[\'mysqli_user\']                 = \'root\';" /var/www/ompd/include/config.inc.php
+			sed -i "/'mysqli_password'/c \$cfg[\'mysqli_password\']                 = \'$GLOBAL_PW\';" /var/www/ompd/include/config.inc.php
+			sed -i "/'media_dir'/c \$cfg[\'media_dir\']                 = \'$FP_DIETPI_USERDATA_DIRECTORY/Music/\';" /var/www/ompd/include/config.inc.php
+
+		fi
+
+		#IceCast + DarkIce
+		INSTALLING_INDEX=135
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			#icecast set passwords:
+			sed -i '/\<source-password\>/c\\<source-password\>dietpi\<\/source-password\>' /etc/icecast2/icecast.xml
+			sed -i '/\<relay-password\>/c\\<relay-password\>dietpi\<\/relay-password\>' /etc/icecast2/icecast.xml
+
+			#	Create random password
+			local admin_password=$(tr -cd '[:alnum:]' < /dev/urandom | fold -w10 | head -n1)
+			sed -i "/\<admin-password\>/c\\<admin-password\>$admin_password\<\/admin-password\>" /etc/icecast2/icecast.xml
+
+			sed -i '/ENABLE=/c\ENABLE=true' /etc/default/icecast2
+
+			#Configure for ALSA loopback?
+			# echo -e "options snd_aloop pcm_substreams=2 #index=10# breaks module loading..." > /etc/modprobe.d/snd_aloop_index.conf
+			# modprobe snd-aloop
+			# if (( ! $(cat /etc/modules | grep -ci -m1 '^snd-aloop') )); then
+
+				# echo -e "snd-aloop" >> /etc/modules
+
+			# fi
+
+			#Darkice
+			local input_device_index=$(arecord -l | grep -m1 'card' | awk '{print $2}' | sed 's/://')
+
+			cat << _EOF_ > /etc/darkice.cfg
+[general]
+duration      = 0
+bufferSecs    = 3
+reconnect     = yes
+
+[input]
+device        = hw:$input_device_index,0
+sampleRate    = 44100
+bitsPerSample = 16
+channel       = 1
+
+[icecast2-0]
+bitrateMode   = vbr
+format        = vorbis
+quality       = 0.8
+server        = dietpi
+port          = 8000
+password      = dietpi
+mountPoint    = DietPi
+name          = DietPi
+description   = DarkIce on DietPi
+url           = http://localhost
+genre         = none
+public        = no
+#localDumpFile = $FP_DIETPI_USERDATA_DIRECTORY/darkice_recording.ogg
+_EOF_
+
+			#SystemD service for Darkice
+			rm /etc/init.d/darkice
+			cat << _EOF_ > /etc/systemd/system/darkice.service
+[Unit]
+Description=DarkIce - DietPi
+After=icecast2.service
+Requires=icecast2.service
+
+[Service]
+Type=simple
+ExecStart=$(which darkice)
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+
+		fi
+
+		#Blynk
+		INSTALLING_INDEX=131
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			# - service
+			local fp_java_binary=$(which java)
+
+			mkdir -p "$FP_DIETPI_USERDATA_DIRECTORY"/blynk
+			CONFIG_FILE_URL_ADDRESS='https://raw.githubusercontent.com/blynkkk/blynk-server/master/server/core/src/main/resources/server.properties'
+			wget "$CONFIG_URL_ADDRESS" -O "$FP_DIETPI_USERDATA_DIRECTORY"/blynk/server.properties
+			sed -i "/data.folder=/c\data.folder=$FP_DIETPI_USERDATA_DIRECTORY/blynk" "$FP_DIETPI_USERDATA_DIRECTORY"/blynk/server.properties
+
+			cat << _EOF_ > /etc/systemd/system/blynkserver.service
+[Unit]
+Description=Blynk Server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=$fp_java_binary -jar /etc/blynkserver/server.jar -serverConfig $FP_DIETPI_USERDATA_DIRECTORY/blynk/server.properties
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+
+		fi
+
+		#MotionEye
+		INSTALLING_INDEX=136
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			#Enable RPi cam
+			if (( $HW_MODEL < 10 )); then
+
+				/DietPi/dietpi/func/dietpi-set_hardware rpi-camera enable
+
+			fi
+
+			mkdir -p /etc/motioneye
+			cp /usr/local/share/motioneye/extra/motioneye.conf.sample /etc/motioneye/motioneye.conf
+
+			mkdir -p "$FP_DIETPI_USERDATA_DIRECTORY"/motioneye
+			sed -i "/^media_path/c\media_path $FP_DIETPI_USERDATA_DIRECTORY/motioneye" /etc/motioneye/motioneye.conf
+
+			#	service
+			cp /usr/local/share/motioneye/extra/motioneye.systemd-unit-local /etc/systemd/system/motioneye.service
+
+		fi
+
+		#CloudPrint
+		INSTALLING_INDEX=137
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			# - Enable web admin
+			cupsctl --remote-admin
+			usermod -a -G lpadmin root
+
+		fi
+
+		#VirtualHere
+		INSTALLING_INDEX=138
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			cat << _EOF_ > /etc/systemd/system/virtualhere.service
+[Unit]
+Description=VirtualHere DietPi service
+After=local-fs.target
+
+[Service]
+Type=simple
+
+ExecStart=/etc/vhusbd/vhusbd -r /var/log/virtualhere.log
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+			systemctl daemon-reload
+
+			echo -e "ServerName='DietPi'" > /etc/vhusbd/config.ini
+
+		fi
+
+		#SABnzbd
+		INSTALLING_INDEX=139
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			cat << _EOF_ > /etc/systemd/system/sabnzbd.service
+[Unit]
+Description=sabnzbd DietPi
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python /etc/sabnzbd/SABnzbd.py -f /etc/sabnzbd/sabnzbd.ini
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+			systemctl daemon-reload
+
+			#Create config:
+			#	API keys and intial config are only generated during 1st run of sabnzbd
+			#	We need to launch program, then apply our config tweaks, else, wizard setup in web interface simply loops without API keys.
+			rm /etc/sabnzbd/sabnzbd.ini &> /dev/null
+
+			systemctl start sabnzbd
+			/DietPi/dietpi/func/dietpi-notify 2 "Generating initial config, please wait..."
+			while [ ! -f /etc/sabnzbd/sabnzbd.ini ]
+			do
+
+				sleep 1
+
+			done
+
+			sleep 2
+
+			systemctl stop sabnzbd
+
+			sleep 2 #additional wait, config being overwritten after below changes: http://dietpi.com/phpbb/viewtopic.php?f=11&t=1848&p=7085#p7082
+
+			sed -i "/^download_dir =/c\download_dir = $FP_DIETPI_USERDATA_DIRECTORY/downloads/incomplete" /etc/sabnzbd/sabnzbd.ini
+			sed -i "/^complete_dir =/c\complete_dir = $FP_DIETPI_USERDATA_DIRECTORY/downloads/complete" /etc/sabnzbd/sabnzbd.ini
+			sed -i "/^nzb_backup_dir =/c\nzb_backup_dir = $FP_DIETPI_USERDATA_DIRECTORY/downloads/sabnzbd_nzb_backup" /etc/sabnzbd/sabnzbd.ini
+			sed -i "/^admin_dir =/c\admin_dir = $FP_DIETPI_USERDATA_DIRECTORY/downloads/sabnzbd_admin" /etc/sabnzbd/sabnzbd.ini
+			sed -i "/^log_dir =/c\log_dir = /var/log" /etc/sabnzbd/sabnzbd.ini
+			sed -i "/^log_level =/c\log_level = 0" /etc/sabnzbd/sabnzbd.ini #err only
+			sed -i "/^refresh_rate =/c\refresh_rate = 2" /etc/sabnzbd/sabnzbd.ini
+			sed -i "/^host =/c\host = 0.0.0.0" /etc/sabnzbd/sabnzbd.ini
+
+		fi
+
+		#spotifyconnectweb
+		INSTALLING_INDEX=141
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			cat << _EOF_ > /etc/systemd/system/spotify-connect-web.service
+[Unit]
+Description=spotify-connect-web
+After=sound.target
+
+[Service]
+Type=simple
+WorkingDirectory=$FP_DIETPI_USERDATA_DIRECTORY/spotify-connect-web
+ExecStart=$FP_DIETPI_USERDATA_DIRECTORY/spotify-connect-web/spotify-connect-web
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+
+		fi
+
+		#couchpotato
+		INSTALLING_INDEX=142
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			cp /etc/couchpotato/init/ubuntu.default /etc/default/couchpotato
+			sed -i "/CP_USER=/c\CP_USER=root" /etc/default/couchpotato
+			sed -i "/CP_HOME=/c\CP_HOME=/etc/couchpotato" /etc/default/couchpotato
+			sed -i "/CP_DATA=/c\CP_DATA=$FP_DIETPI_USERDATA_DIRECTORY/couchpotato" /etc/default/couchpotato
+
+			mkdir -p "$FP_DIETPI_USERDATA_DIRECTORY"/couchpotato
+			#useradd -d "$FP_DIETPI_USERDATA_DIRECTORY"/couchpotato couchpotato
+
+			cp /etc/couchpotato/init/ubuntu /etc/init.d/couchpotato
+
+		fi
+
+		#Koel
+		INSTALLING_INDEX=143
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			Download_Test_Media
+
+			/DietPi/dietpi/func/create_mysql_db koel "$GLOBAL_PW" root "$GLOBAL_PW"
+
+			cd /var/www/koel
+
+			sed -i '/DB_CONNECTION=/c\DB_CONNECTION=mysql' .env
+			sed -i '/DB_HOST=/c\DB_HOST=127.0.0.1' .env
+			sed -i '/DB_DATABASE=/c\DB_DATABASE=koel' .env
+			sed -i '/DB_USERNAME=/c\DB_USERNAME=root' .env
+			sed -i "/DB_PASSWORD=/c\DB_PASSWORD=$GLOBAL_PW" .env
+
+			sed -i '/ADMIN_EMAIL=/c\ADMIN_EMAIL=dietpi@dietpi.com' .env
+			sed -i '/ADMIN_NAME=/c\ADMIN_NAME=admin' .env
+			sed -i "/ADMIN_PASSWORD=/c\ADMIN_PASSWORD=$GLOBAL_PW" .env
+
+			sed -i "/FFMPEG_PATH=/c\FFMPEG_PATH=$(which ffmpeg)" .env
+
+			php artisan koel:init
+
+			cd "$HOME"
+
+			cat << _EOF_ > /etc/systemd/system/koel.service
+[Unit]
+Description=Koel
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/koel
+ExecStart=$(which php) /var/www/koel/artisan serve --host 0.0.0.0
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+
+		fi
+
+		#Sonarr
+		INSTALLING_INDEX=144
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			cat << _EOF_ > /etc/systemd/system/sonarr.service
+[Unit]
+Description=Sonarr (NzbDrone) Daemon
+After=network.target
+
+[Service]
+User=root
+Restart=on-failure
+RestartSec=5
+Type=simple
+ExecStart=/usr/bin/mono --debug /opt/NzbDrone/NzbDrone.exe -nobrowser
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+
+		fi
+
+		#Radarr
+		INSTALLING_INDEX=145
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			cat << _EOF_ > /etc/systemd/system/radarr.service
+[Unit]
+Description=Radarr Daemon
+After=network.target
+
+[Service]
+User=root
+Restart=on-failure
+RestartSec=5
+Type=simple
+ExecStart=/usr/bin/mono --debug /opt/Radarr/Radarr.exe -nobrowser
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+
+		fi
+
+		#PlexPy
+		INSTALLING_INDEX=146
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			mkdir -p "$FP_DIETPI_USERDATA_DIRECTORY"/plexpy
+
+			cat << _EOF_ > /etc/systemd/system/plexpy.service
+[Unit]
+Description=PlexPy - Stats for Plex Media Server usage
+
+[Service]
+ExecStart=/opt/plexpy/PlexPy.py --quiet --daemon --nolaunch --config /opt/plexpy/config.ini --datadir $FP_DIETPI_USERDATA_DIRECTORY/plexpy
+GuessMainPID=no
+Type=forking
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+
+		fi
+
+		#Jackett
+		INSTALLING_INDEX=147
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			cat << _EOF_ > /etc/systemd/system/jackett.service
+[Unit]
+Description=Jackett Daemon
+After=network.target
+
+[Service]
+User=root
+Restart=always
+RestartSec=5
+Type=simple
+ExecStart=/usr/bin/mono --debug /opt/jackett/JackettConsole.exe
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+
+		fi
+
+		#NZBget
+		INSTALLING_INDEX=149
+		if (( ${aSOFTWARE_INSTALL_STATE[$INSTALLING_INDEX]} == 1 )); then
+
+			sed -i "/MainDir=/c\MainDir=$FP_DIETPI_USERDATA_DIRECTORY/downloads" "$FP_DIETPI_USERDATA_DIRECTORY"/nzbget/nzbget.conf
+			sed -i "/DestDir=/c\DestDir=$FP_DIETPI_USERDATA_DIRECTORY/downloads/complete" "$FP_DIETPI_USERDATA_DIRECTORY"/nzbget/nzbget.conf
+
+			sed -i "/LogFile=/c\LogFile=/var/log/nzbget.log" "$FP_DIETPI_USERDATA_DIRECTORY"/nzbget/nzbget.conf
+
+			sed -i "/ControlUsername=/c\ControlUsername=root" "$FP_DIETPI_USERDATA_DIRECTORY"/nzbget/nzbget.conf
+			sed -i "/ControlPassword=/c\ControlPassword=$GLOBAL_PW" "$FP_DIETPI_USERDATA_DIRECTORY"/nzbget/nzbget.conf
+
+			cat << _EOF_ > /etc/systemd/system/nzbget.service
+[Unit]
+Description=NZBget
+
+[Service]
+Type=forking
+User=root
+WorkingDirectory=$FP_DIETPI_USERDATA_DIRECTORY/nzbget
+ExecStart=$FP_DIETPI_USERDATA_DIRECTORY/nzbget/nzbget -D
+
+[Install]
+WantedBy=multi-user.target
+_EOF_
+
+		fi
 		#-------------------------------------------------------------------
 
 	}
@@ -9088,10 +10833,11 @@ _EOF_
 			gpu_memory=192
 
 		#Define Memory Split Modes with installed software
-		#Mode 3 (KODI / DIETPICAM / UAE4ARM / MED GPU RAM / 128MB)
+		#Mode 3 (KODI / DIETPICAM / UAE4ARM / JRiver / MED GPU RAM / 128MB)
 		elif (( ${aSOFTWARE_INSTALL_STATE[31]} == 2 ||
 			${aSOFTWARE_INSTALL_STATE[59]} == 2 ||
-			${aSOFTWARE_INSTALL_STATE[108]} == 2 )); then
+			${aSOFTWARE_INSTALL_STATE[108]} == 2 ||
+			${aSOFTWARE_INSTALL_STATE[148]} == 2 )); then
 
 			gpu_enabled=1
 			gpu_memory=128
@@ -9120,9 +10866,7 @@ _EOF_
 			#RPi
 			if (( $HW_MODEL < 10 )); then
 
-				sed -i "/gpu_mem_256=/c\gpu_mem_256=$gpu_memory" /DietPi/config.txt
-				sed -i "/gpu_mem_512=/c\gpu_mem_512=$gpu_memory" /DietPi/config.txt
-				sed -i "/gpu_mem_1024=/c\gpu_mem_1024=$gpu_memory" /DietPi/config.txt
+				/DietPi/dietpi/func/dietpi-set_hardware gpumemsplit $gpu_memory
 
 			fi
 
@@ -9153,12 +10897,15 @@ _EOF_
 
 	}
 
-	Dedicated_Usb_Drive_Enable(){
+	Check_USB_Drive_Installed(){
 
 		USBDRIVE=0
 
+		FP_DIETPI_DEDICATED_USBDRIVE=$(df -P | grep -m1 '^/dev/sda1' | awk '{print $6}')
+
 		#Only enable if mounted
-		if (( $(df -P | grep -ci -m1 "$FP_DIETPI_DEDICATED_USBDRIVE") )); then
+		if [ -n "$FP_DIETPI_DEDICATED_USBDRIVE" ] &&
+			(( $(df -P | grep -ci -m1 "$FP_DIETPI_DEDICATED_USBDRIVE") )); then
 
 			USBDRIVE=1
 
@@ -9167,6 +10914,8 @@ _EOF_
 	}
 
 	Uninstall_Software(){
+
+		#NB: systemctl daemon-reload is executed after this func in Uninstall_Software_Finalize()
 
 		#----------------------------------------------------------------------
 		#Inform User
@@ -9318,10 +11067,13 @@ _EOF_
 
 		elif (( $1 == 32 )); then
 
-			AGP mpd libmpdclient2
 			update-rc.d ympd remove
 			rm /etc/init.d/ympd
 			rm /usr/bin/ympd
+
+		elif (( $1 == 128 )); then
+
+			AGP mpd libmpdclient2
 
 		elif (( $1 == 121 )); then
 
@@ -9349,6 +11101,143 @@ _EOF_
 
 			AGP openmediavault
 			rm /etc/apt/sources.list.d/openmediavault.list
+
+		elif (( $1 == 129 )); then
+
+			rm -R /var/www/ompd
+			systemctl start mysql
+			mysqladmin -u root -p"$GLOBAL_PW" drop ompd -f
+
+		elif (( $1 == 130 )); then
+
+			AGP python-pip
+
+		elif (( $1 == 131 )); then
+
+			rm /etc/systemd/system/blynkserver.service
+
+			rm -R /etc/blynkserver
+
+		elif (( $1 == 132 )); then
+
+			rm /etc/systemd/system/aria2.service
+
+			rm /usr/local/bin/aria2c
+
+			rm -R /var/www/aria2
+
+		elif (( $1 == 133 )); then
+
+			rm /etc/systemd/system/yacy.service
+
+
+			rm -R /etc/yacy
+
+		elif (( $1 == 134 )); then
+
+			rm /etc/systemd/system/tonido.service
+
+			rm -R /etc/tonido
+
+			rm "$HOME"/tonido
+			rm "$HOME"/TonidoSync
+			rm "$HOME"/TonidoSyncData
+
+		elif (( $1 == 135 )); then
+
+			AGP darkice icecast2
+			rm /etc/systemd/system/darkice.service
+
+
+		elif (( $1 == 136 )); then
+
+			AGP motion
+
+			rm -R /etc/motioneye
+
+			rm /etc/systemd/system/motioneye.service
+
+			pip uninstall -y motioneye
+
+		elif (( $1 == 137 )); then
+
+			AGP cloudprint-service
+			if (( $DISTRO == 3 )); then
+
+				rm /etc/apt/sources.list.d/cloudprint.list
+				apt-get update
+
+			fi
+
+		elif (( $1 == 138 )); then
+
+			rm -R /etc/vhusbd
+
+			rm /etc/systemd/system/virtualhere.service
+
+		elif (( $1 == 139 )); then
+
+			rm -R /etc/sabnzbd
+
+			rm /etc/systemd/system/sabnzbd.service
+
+		elif (( $1 == 140 )); then
+
+			AGP libsdl2 libsdl2-image libsdl2-mixer libsdl2-net libsdl2-ttf libsmpeg2
+
+		elif (( $1 == 141 )); then
+
+			rm -R "$FP_DIETPI_USERDATA_DIRECTORY"/spotify-connect-web
+			rm /etc/systemd/system/spotify-connect-web.service
+
+		elif (( $1 == 142 )); then
+
+			rm -R /etc/couchpotato
+			rm -R "$FP_DIETPI_USERDATA_DIRECTORY"/couchpotato
+			rm /etc/init.d/couchpotato
+
+			#userdel -f couchpotato
+
+		elif (( $1 == 143 )); then
+
+			systemctl start mysql
+			mysqladmin -u root -p"$GLOBAL_PW" drop koel -f
+
+			rm -R /var/www/koel
+
+			rm /etc/systemd/system/koel.service
+
+		elif (( $1 == 144 )); then
+
+			AGP nzbdrone
+			rm /etc/systemd/system/sonarr.service
+			rm /etc/apt/sources.list.d/sonarr.list
+			apt-get update
+
+		elif (( $1 == 145 )); then
+
+			rm -R /opt/Radarr
+			rm /etc/systemd/system/radarr.service
+
+		elif (( $1 == 146 )); then
+
+			rm -R /opt/plexpy
+			rm -R "$FP_DIETPI_USERDATA_DIRECTORY"/plexpy
+			rm /etc/systemd/system/plexpy.service
+
+		elif (( $1 == 147 )); then
+
+			rm -R /opt/jackett
+			rm /etc/systemd/system/jackett.service
+
+		elif (( $1 == 148 )); then
+
+			AGP mediacenter22
+
+		elif (( $1 == 149 )); then
+
+			rm -R "$FP_DIETPI_USERDATA_DIRECTORY"/nzbget
+			rm /etc/systemd/system/nzbget.service
 
 		elif (( $1 == 119 )); then
 
@@ -9433,6 +11322,9 @@ _EOF_
 			AGP dnsmasq
 			pihole uninstall
 
+			#https://github.com/Fourdee/DietPi/issues/753
+			chmod 774 /etc/lighttpd/lighttpd.conf &> /dev/null
+
 			rm -R /etc/pihole
 			rm -R /etc/.pihole
 			rm -R /var/www/html/admin
@@ -9456,12 +11348,13 @@ _EOF_
 
 		elif (( $1 == 68 )); then
 
-			#Uninstaller does not uninstall.
-			#"$HOME"/weaved_software/uninstaller.sh
-
+			# <= v150 (weaved)
 			rm -R /etc/weaved
 			rm -R "$HOME"/weaved_software
 			rm "$HOME"/weaved_setup.bin
+
+			# Remot3.it
+			AGP weavedconnectd
 
 		elif (( $1 == 62 )); then
 
@@ -9620,6 +11513,7 @@ _EOF_
 		elif (( $1 == 37 )); then
 
 			AGP shairport-sync*
+			userdel -f shairport-sync
 
 		elif (( $1 == 38 )); then
 
@@ -9735,6 +11629,7 @@ _EOF_
 			rm /var/log/gogs_daemon.log
 			rm /var/log/gogs.log
 
+			systemctl start mysql
 			mysqladmin -u root -p"$GLOBAL_PW" drop gogs -f
 
 		elif (( $1 == 46 )); then
@@ -9777,8 +11672,9 @@ _EOF_
 
 		elif (( $1 == 108 )); then
 
-			rm -R /etc/uae4arm-rpi
-			rm /etc/systemd/system/uae4arm-rpi.service
+			rm -R /etc/amiberry
+			rm /etc/systemd/system/amiberry.service
+			rm /etc/systemd/system/amiberry-sdl2.service
 
 			#Disable autostart, revert boot index to console
 			/DietPi/dietpi/dietpi-autostart 0
@@ -9841,6 +11737,10 @@ _EOF_
 
 			AGP vim vim-tiny
 
+		elif (( $1 == 127 )); then
+
+			AGP neovim
+
 		elif (( $1 == 0 )); then
 
 			#This also removes OpenSSH server. So lets check OpenSSH server isnt installed before hand.
@@ -9899,11 +11799,10 @@ _EOF_
 
 		elif (( $1 == 5 )); then
 
-			AGP alsa-base alsa-utils
+			AGP alsa-utils
 
 			#DietPi-JustBoom, remove bash alias for config panel:
 			sed -i '/dietpi-justboom/d' /etc/bash.bashrc &> /dev/null
-
 
 		elif (( $1 == 6 )); then
 
@@ -9921,10 +11820,11 @@ _EOF_
 			#Add info file for installation method.
 			echo -e "FTP client mount can be installed and setup by DietPi-Config.\nSimply run: dietpi-config and select the Networking Options: NAS/Misc menu" > /mnt/ftp_client/readme.txt
 
-
 		elif (( $1 == 7 )); then
 
 			AGP ffmpeg
+			# + RPi
+			AGP libx264 libmp3lame libfdk-aac
 
 		elif (( $1 == 8 )); then
 
@@ -10000,17 +11900,18 @@ _EOF_
 		apt-get autoremove --purge -y
 
 		#Check if we need to clear DietPi choices
-		dpkg -l > /tmp/.dietpi-uninstall_dpkg
-		if (( $(cat /tmp/.dietpi-uninstall_dpkg | grep -ci -m1 'openssh-server') == 0 &&
-			$(cat /tmp/.dietpi-uninstall_dpkg | grep -ci -m1 'dropbear') == 0 )); then
+		local fp_temp='/tmp/.dietpi-uninstall_dpkg'
+		dpkg -l | awk '{print $2}' > "$fp_temp"
+		if (( $(cat "$fp_temp" | grep -ci -m1 '^openssh-server') == 0 &&
+			$(cat "$fp_temp" | grep -ci -m1 '^dropbear') == 0 )); then
 
 			INDEX_SSHSERVER_CURRENT=0
 			INDEX_SSHSERVER_TARGET=0
 
 		fi
 
-		if (( $(cat /tmp/.dietpi-uninstall_dpkg | grep -ci -m1 ' samba ') == 0 &&
-			$(cat /tmp/.dietpi-uninstall_dpkg | grep -ci -m1 'proftpd-basic') == 0 )); then
+		if (( $(cat "$fp_temp" | grep -ci -m1 '^samba$') == 0 &&
+			$(cat "$fp_temp" | grep -ci -m1 '^proftpd-basic') == 0 )); then
 
 			INDEX_FILESERVER_CURRENT=0
 			INDEX_FILESERVER_TARGET=0
@@ -10018,15 +11919,15 @@ _EOF_
 		fi
 
 		if (( $(cat /etc/fstab | grep -ci -m1 '#/var/log') == 1 &&
-			$(cat /tmp/.dietpi-uninstall_dpkg | grep -ci -m1 'rsyslog') == 0 &&
-			$(cat /tmp/.dietpi-uninstall_dpkg | grep -ci -m1 'logrotate') == 0 )); then
+			$(cat "$fp_temp" | grep -ci -m1 '^rsyslog') == 0 &&
+			$(cat "$fp_temp" | grep -ci -m1 '^logrotate') == 0 )); then
 
 			INDEX_LOGGING_CURRENT=0
 			INDEX_LOGGING_TARGET=0
 
 		fi
 
-		rm /tmp/.dietpi-uninstall_dpkg
+		rm "$fp_temp"
 
 		systemctl daemon-reload
 
@@ -10034,6 +11935,9 @@ _EOF_
 
 	Run_Installations(){
 
+		#------------------------------------------------------------
+		#Abort if time sync is incomplete
+		Check_NTPD_Status
 		#------------------------------------------------------------
 		#Disable powersaving on Main screen during installation
 		setterm -blank 0 -powersave off 2> /dev/null
@@ -10043,26 +11947,6 @@ _EOF_
 		#------------------------------------------------------------
 		#Generate userdata folders:
 		Create_UserContent_Folders
-		#------------------------------------------------------------
-		#First run: Move userdata location. Auto and/or custom
-		if (( $DIETPI_INSTALL_STAGE == 0 )); then
-
-			local current_userdata_dir=$(/DietPi/dietpi/func/dietpi-set_userdata return_source)
-
-			# - Run the script to move user data location if required (now accepts Auto
-			local target_userdata_dir=$(cat /DietPi/dietpi.txt | grep -m1 'dietpi_userdata_basedirectory=' | sed 's/.*=//' | tr '[:upper:]' '[:lower:]')
-			/DietPi/dietpi/func/dietpi-set_userdata "$current_userdata_dir" "$target_userdata_dir"
-
-			# - Check for failure
-			if (( $? != 0 )); then
-
-				Error_Create_UserDataDirectory
-				Exit_Destroy
-
-			fi
-
-		fi
-
 		#------------------------------------------------------------
 		#Set current path to home folder
 		cd "$HOME"
@@ -10077,8 +11961,8 @@ _EOF_
 		#Simluated apt installation to check for failures related to apt-cache.
 		/DietPi/dietpi/func/dietpi-notify 2 "Running apt simulation to check for errors, please wait..."
 		local package_to_test='bash-doc'
-		apt-get install $package_to_test -s -y &> /dev/null
-		local result=$?
+		apt-get install $package_to_test -qq -s -y 2>&1 | tee "$FP_APT_LOG"
+		local result=${PIPESTATUS[0]}
 
 		/DietPi/dietpi/func/dietpi-notify -1 $result "Apt simulation |"
 
@@ -10092,7 +11976,7 @@ _EOF_
 		Banner_Setup
 		Banner_Apt_Update
 		# - Set noninteractive | Allows automation for some software
-		DEBIAN_FRONTEND='noninteractive' apt-get upgrade -y
+		DEBIAN_FRONTEND='noninteractive' apt-get upgrade -y --force-yes
 
 		#Generate dir for dietpi-software installed "non-service" based control scripts
 		mkdir -p /etc/dietpi/dietpi-software/services
@@ -10129,6 +12013,10 @@ _EOF_
 		Install_Apply_Configs
 
 		Install_Apply_Permissions &> /dev/null
+
+		#Apply autostart index
+		local autostart_current=$(cat /DietPi/dietpi/.dietpi-autostart_index)
+		/DietPi/dietpi/dietpi-autostart $autostart_current
 
 		#Disable services so DietPi-services can take control (DietPi will start all services from rc.local)
 		/DietPi/dietpi/dietpi-services disable
@@ -10236,7 +12124,7 @@ _EOF_
 
 			fi
 
-			if (( $run_custom_script == 1 )); then
+			if (( $run_custom_script )); then
 
 				chmod +x /root/AUTO_CustomScript.sh
 				/root/AUTO_CustomScript.sh
@@ -10314,14 +12202,6 @@ _EOF_
 			#Set start install
 			GOSTARTINSTALL=1
 
-			#Auto format/setup USB drive
-			if [ -f /boot/Automation_Format_My_Usb_Drive ]; then
-
-				#Run Format
-				/DietPi/dietpi/dietpi-drive_manager 1
-
-			fi
-
 			#Find all software entires of AUTO_DietpiSoftware_Install_ID= in dietpi.txt. Then set to state 1 for installation.
 			while read -r line
 			do
@@ -10389,66 +12269,12 @@ _EOF_
 
 	}
 
-	FirstRun_Questions(){
-
-		local string_setup_usb_drive_desc='If you choose to setup a dedicated USB drive, DietPi will automatically configure your future software installations to utilize the USB drive for user data storage, instead of SD.\nAs USB hard drives can be faster than most SD cards, using a USB drive can vastly improve system performance.\n\nExamples of software, that will benefit from a USB drive: \n - BitTorrent (Store downloads) \n - OwnCloud (Larger data storage)\n - Kodi / Plex / Emby etc (Store Media Files)\n\nMore information on user data in DietPi:\n - http://dietpi.com/phpbb/viewtopic.php?f=8&t=478&p=2087\n\nWould you like to setup a USB drive now?'
-
-		#AmiBerry Special: https://github.com/Fourdee/DietPi/issues/513
-		if (( $(cat /DietPi/dietpi.txt | grep -ci -m1 '^AUTO_DietpiSoftware_Install_ID=108$') )); then
-
-			WHIP_TITLE='Setup USB Dedicated Drive?'
-			WHIP_QUESTION="$string_setup_usb_drive_desc"
-			whiptail --title "$WHIP_TITLE" --yesno "$WHIP_QUESTION" --backtitle "$WHIP_BACKTITLE" --defaultno 21 70
-			CHOICE=$?
-			if (( $CHOICE == 0 )); then
-
-				#Run full drive manager
-				/DietPi/dietpi/dietpi-drive_manager
-
-			fi
-
-		fi
-
-		if (( $USER_INPUTS )); then
-
-			#Questions Start (Ask our inital questions, before allowing access to the software selection menus)
-			WHIP_TITLE='DietPi - Welcome'
-			whiptail --title "$WHIP_TITLE" --msgbox "Welcome to the DietPi Installation System. \n \nBefore we can begin, we need to ask you a few questions regarding this installation. \n \nPress Enter to begin." 14 70
-
-			#Request for Dedicated External Drive installation.
-			if (( ! $USBDRIVE && $HW_MODEL != 20 )); then
-
-				WHIP_TITLE='Setup USB Dedicated Drive?'
-				WHIP_QUESTION="$string_setup_usb_drive_desc"
-				whiptail --title "$WHIP_TITLE" --yesno "$WHIP_QUESTION" --backtitle "$WHIP_BACKTITLE" --defaultno 21 70
-				CHOICE=$?
-				if (( $CHOICE == 0 )); then
-
-					#Run old external drive setup (1 drive, simple interface)
-					/DietPi/dietpi/dietpi-drive_manager 2
-
-				fi
-
-			fi
-
-			#Questions End
-			if (( $AUTOINSTALL_ENABLED == 0 )); then
-
-				WHIP_TITLE='DietPi - Questions Completed'
-				whiptail --title "$WHIP_TITLE" --msgbox "The DietPi-Software menu will now appear with the following options: \n\n- Select DietPi Optimized Software\nThis will allow you to select Optimized and Ready to Run software.\nhttp://dietpi.com/software\n\n- Select Additional Linux Software.\nThis will allow you to select standard linux software relative to this installation. \n\n- DietPi-Config\nA feature rich configuration tool for your device.\n \n- Go Start Install\nThis will start the installation process for your selected items." 21 75
-
-			fi
-
-		fi
-
-	}
-
 	#/////////////////////////////////////////////////////////////////////////////////////
 	# Internet Connection Test Vars
 	#/////////////////////////////////////////////////////////////////////////////////////
 	INTERNET_CONNECTED=0
 	#Use /etc/apt/sources.list for connection test
-	INTERNET_URL_TEST=$(cat /etc/apt/sources.list | grep -m1 "deb http" | awk '{print $2}')
+	INTERNET_URL_TEST=$(cat /etc/apt/sources.list | grep -m1 'deb ' | awk '{print $2}')
 
 	Check_Internet_Connection(){
 
@@ -10832,7 +12658,7 @@ _EOF_
 
 		if (( $USER_INPUTS )); then
 
-			whiptail --title "Error" --msgbox "$ERROR_TEXT" 16 70
+			whiptail --title "Error" --msgbox "$ERROR_TEXT" 18 70
 
 		else
 
@@ -10859,17 +12685,20 @@ _EOF_
 
 		if [ "$1" = "simulation" ]; then
 
-			ERROR_TEXT="Apt-get simulation has failed.\n\nDietPi-Software will now exit."
+			ERROR_TEXT="Apt-get simulation has failed.\n - Apt log = $(echo -e $FP_APT_LOG)\n\nDietPi-Software will now exit."
 			Error_Display
 
 		else
 
-			ERROR_TEXT="Apt-get has failed:\n - Apt string = $string\n - Error code = $result\n - Software Title = ${aSOFTWARE_WHIP_NAME[$INSTALLING_INDEX]}: ${aSOFTWARE_WHIP_DESC[$INSTALLING_INDEX]}\n\nPlease report this issue to DietPi so it can be investigated.\n\nDietPi-Software will now exit."
+			ERROR_TEXT="Apt-get has failed:\n - Apt string = $string\n - Error code = $result\n - Software Title = ${aSOFTWARE_WHIP_NAME[$INSTALLING_INDEX]}: ${aSOFTWARE_WHIP_DESC[$INSTALLING_INDEX]}\n - Apt log = $(echo -e $FP_APT_LOG)\n\nPlease report this issue to DietPi so it can be investigated.\n\nDietPi-Software will now exit."
 			Error_Display
 
 		fi
 
-		/DietPi/dietpi/func/dietpi-notify 1 "The apt cache may be corrupt, apt mirror offline, or you have held broken pacakages. DietPi-Software will now exit.\n"
+		/DietPi/dietpi/func/dietpi-notify 1 "The apt cache may be corrupt, apt mirror offline, or you have held broken packages. DietPi-Software will now exit.\n"
+
+		/DietPi/dietpi/func/dietpi-notify 2 "Apt Log:\n$(cat $FP_APT_LOG)\n"
+
 		/DietPi/dietpi/func/dietpi-notify 2 "Please try:"
 		/DietPi/dietpi/func/dietpi-notify 2 "- Fixing apt package errors with 'apt-get install -f'"
 		/DietPi/dietpi/func/dietpi-notify 2 "- Change apt mirror: 'dietpi-config' > 'Networking: NAS/MISC' > 'Apt Mirror'"
@@ -10880,10 +12709,13 @@ _EOF_
 
 	}
 
-	Error_Create_UserDataDirectory(){
+	Error_NTPD_Failed(){
 
-		ERROR_TEXT="DietPi was unable to create your user data directory:\n\n $(cat /var/log/dietpi-move_userdata.log)\n\nDietPi-Software will now exit."
+		#Abort install
+		ERROR_TEXT="NTPD: System time has not been synced/updated correctly.\n\nTo prevent further issues with software installations, DietPi-Software will now exit.\n\nIf problems persist, check the NTPD log:\n   /var/log/ntpd.log\n\nTo override this error, run the following command:\n   echo 0 > /etc/dietpi/.ntpd_exit_status"
 		Error_Display
+
+		Exit_Destroy
 
 	}
 
@@ -11079,19 +12911,16 @@ _EOF_
 		fi
 
 		#Hold our string that tells the user what software will be removed when using Index based choice systems
-		local toberemoved_text=""
+		local toberemoved_text=''
+
+		#Check status of USB drive
+		Check_USB_Drive_Installed
 
 		#Where is userdata stored?
-		local user_data_location_mode=$(cat /DietPi/dietpi.txt | grep -m1 '^dietpi_userdata_basedirectory=' | sed 's/.*=//' | tr '[:upper:]' '[:lower:]')
 		local user_data_location_current=$(/DietPi/dietpi/func/dietpi-set_userdata return_source)
-		local user_data_location_auto_target=$(/DietPi/dietpi/func/dietpi-set_userdata return_auto)
 
 		local user_data_location_description=''
-		if [ "$user_data_location_mode" = "auto" ] && (( $DIETPI_INSTALL_STAGE == 0 )); then
-
-			user_data_location_description="Auto | $user_data_location_auto_target"
-
-		elif [ "$user_data_location_current" = "$FP_DIETPI_DEDICATED_USBDRIVE" ]; then
+		if [ "$user_data_location_current" = "$FP_DIETPI_DEDICATED_USBDRIVE" ]; then
 
 			user_data_location_description="USB Drive | $user_data_location_current"
 
@@ -11120,7 +12949,7 @@ _EOF_
 		WHIP_TITLE='DietPi-Software'
 		WHIP_BACKTITLE="DietPi-Software | IP: $(sed -n 4p /DietPi/dietpi/.network) | Device: $HW_MODEL_DESCRIPTION"
 
-		OPTION=$(whiptail --title "$WHIP_TITLE" --backtitle "$WHIP_BACKTITLE" --menu "" --default-item "$MENU_MAIN_LASTITEM" --cancel-button "Exit" 20 75 13 \
+		OPTION=$(whiptail --title "$WHIP_TITLE" --backtitle "$WHIP_BACKTITLE" --menu "" --default-item "$MENU_MAIN_LASTITEM" --cancel-button "Exit" 20 100 13 \
 		"Help!" "Links to online guides, docs and information" \
 		"DietPi-Config" "Feature-rich configuration tool for your device" \
 		"" "─── Select Software ─────────────────────────" \
@@ -11204,6 +13033,7 @@ _EOF_
 
 					fi
 			  ;;
+
 			  "File Server")
 
 					WHIP_TITLE='Fileserver Choices'
@@ -11285,93 +13115,43 @@ _EOF_
 
 					# - Vars if we need to move data.
 					local move_data_target=$user_data_location_current
-					local custom_location=1 #As we are now replacing Auto when the user selects Force DRIVE, we need to know what is considered a custom location.
 
-					#Auto info
-					local autostate_text='Select now to use Auto location.'
-					if [ "$user_data_location_mode" = "auto" ] &&
-						(( $DIETPI_INSTALL_STAGE == 0 )); then
-
-						autostate_text="Active | $user_data_location_description"
-
-					fi
-
-					#Flash info
-					local flashdrive_text='Not active. Select to move data.'
-					if [ "$user_data_location_current" = "$FP_DIETPI_USERDATA_DIRECTORY" ]; then
-
-						flashdrive_text="Active ($FP_DIETPI_USERDATA_DIRECTORY)."
-						custom_location=0
-
-					fi
-
-					#USB info
-					local usbdrive_text='Not active. Select to move data.'
-					if (( ! $USBDRIVE )); then
-
-						usbdrive_text='Select to setup a USB drive for your user data.'
-
-					elif [ "$user_data_location_current" = "$FP_DIETPI_DEDICATED_USBDRIVE" ]; then
-
-						usbdrive_text="Active ($FP_DIETPI_USERDATA_DIRECTORY > $FP_DIETPI_DEDICATED_USBDRIVE)."
-						custom_location=0
-
-					fi
-
-					#Manual info
-					local manual_text='Not active. Select to move data.'
-					if (( $custom_location )) &&
-						[ "$user_data_location_current" = "$user_data_location_mode" ]; then
-
-						manual_text="Active ($FP_DIETPI_USERDATA_DIRECTORY > $user_data_location_mode)."
-
-					fi
-
-					OPTION=$(whiptail --title "$WHIP_TITLE" --menu "Choose where to store your user data. User data includes software such as Owncloud data store, BitTorrent downloads etc\n\nMore information on user data in DietPi:\n - http://dietpi.com/phpbb/viewtopic.php?f=8&t=478&p=2087\n\n> Auto\nIf a dedicated USB drive is setup on this system, DietPi will use that device. If not, Flash Storage will be used.\n\n> Manual\nInput a custom directory that will be used for your user data." --cancel-button "Back" --default-item "$index_fileserver_text" 23 75 4 \
-					"Auto" "$autostate_text" \
-					"Force Flash Drive" "$flashdrive_text" \
-					"Force USB Drive" "$usbdrive_text" \
-					"Manual" "$manual_text" 3>&1 1>&2 2>&3)
+					OPTION=$(whiptail --title "$WHIP_TITLE" --menu "Choose where to store your user data. User data includes software such as Owncloud data store, BitTorrent downloads etc\n\nMore information on user data in DietPi:\n - http://dietpi.com/phpbb/viewtopic.php?f=8&t=478&p=2087\n\n> DietPi-Drive Manager\nLaunch DietPi-Drive Manager to setup external drives, and, move user data to different locations." --cancel-button "Back" 20 85 3 \
+					"Drive Manager" "Launches DietPi-Drive Manager" \
+					"List" "Select from a list of available mounts/drives, to move user data" \
+					"Custom" "Input a manual location to move user data" 3>&1 1>&2 2>&3)
 					CHOICE=$?
 
 					if (( $CHOICE == 0 )); then
 
+						# - DriveMan
+						if [ "$OPTION" = "Drive Manager" ]; then
 
-						# - Force flash
-						if [ "$OPTION" = "Force Flash Drive" ]; then
+							/DietPi/dietpi/dietpi-drive_manager
 
-							move_data_target=$FP_DIETPI_USERDATA_DIRECTORY
+						# - List
+						elif [ "$OPTION" = "List" ]; then
 
-						# - Setup dedicated drive
-						elif [ "$OPTION" = "Force USB Drive" ]; then
+							/DietPi/dietpi/dietpi-drive_manager 1
 
-							if (( ! $USBDRIVE )); then
+							local return_value="$(cat /tmp/dietpi-drive_manager_selmnt)"
+							if [ -n "$return_value" ]; then
 
-								/DietPi/dietpi/dietpi-drive_manager 2
+								if [ "$return_value" = "/" ]; then
 
-								#Enable USB drive for this system if sucessful.
-								Dedicated_Usb_Drive_Enable
+									return_value='/mnt'
+
+								fi
+
+								move_data_target="$return_value"
+								move_data_target+='/dietpi_userdata'
 
 							fi
-
-							if (( $USBDRIVE )); then
-								move_data_target=$FP_DIETPI_DEDICATED_USBDRIVE
-							fi
-
-						# - Auto
-						elif [ "$OPTION" = "Auto" ]; then
-
-							move_data_target='Auto'
 
 						# - Manual filepath entry
-						elif [ "$OPTION" = "Manual" ]; then
+						elif [ "$OPTION" = "Custom" ]; then
 
-							local default_item=$user_data_location_mode
-							if [ "$default_item" = "auto" ]; then
-								default_item=''
-							fi
-
-							OPTION=$(whiptail --inputbox "Please input a location. Your user data will be stored inside this location.\n - eg: /mnt/MyDrive/MyData" 11 60 "$default_item" --title "User/Personal Data Directory" --backtitle "$WHIP_BACKTITLE" 3>&1 1>&2 2>&3)
+							OPTION=$(whiptail --inputbox "Please input a location. Your user data will be stored inside this location.\n - eg: /mnt/MyDrive/MyData" 11 60 "$user_data_location_current" --title "User/Personal Data Directory" --backtitle "$WHIP_BACKTITLE" 3>&1 1>&2 2>&3)
 							CHOICE=$?
 							if (( $CHOICE == 0 )); then
 								move_data_target=$OPTION
@@ -11381,14 +13161,6 @@ _EOF_
 
 						# - Move data if the new entry has changed
 						if [ "$user_data_location_current" != "$move_data_target" ]; then
-
-							# - If 'auto' was used, grab location
-							local target_to_lowercase=$(echo -e "$move_data_target" | tr '[:upper:]' '[:lower:]')
-							if [ "$target_to_lowercase" = "auto" ]; then
-
-								move_data_target=$(/DietPi/dietpi/func/dietpi-set_userdata return_auto)
-
-							fi
 
 							# - Ask before we begin
 							whiptail --title "User data transfer" --yesno "DietPi will now attempt to transfer your existing user data to the new location:\n\n - From: $user_data_location_current\n - To: $move_data_target\n\nWould you like to begin?" --backtitle "$WHIP_BACKTITLE" --defaultno 14 70
@@ -11414,6 +13186,7 @@ _EOF_
 
 					fi
 				;;
+
 			  "Webserver Preference")
 				WHIP_TITLE='Webserver Preference'
 				OPTION=$(whiptail --title "$WHIP_TITLE" --menu "More Info: http://dietpi.com/phpbb/viewtopic.php?f=8&t=5&p=1549#p1549\n\n> Apache2\nFeature-rich and popular. Recommended for beginners and users who are looking to follow Apache2 based guides.\n\n> Nginx\nLightweight alternative to Apache2. Nginx claims faster webserver performance compared to Apache2.\n\n> Lighttpd\nExtremely lightweight and is generally considered to offer the \"best\" webserver performance for SBC's. Recommended for users who expect low webserver traffic." --cancel-button "Back" --default-item "$index_webserver_text" 24 75 3 \
@@ -11467,7 +13240,7 @@ _EOF_
 
 							# - inform user
 							WHIP_TITLE="Error: Incompatible Webserver Preference"
-							WHIP_QUESTION="Unable to change your webserver preference to $OPTION.\n\nThis is due to an existing and incompatible webserver installation on your system ($info_currently_installed_webserver). Please remove all webserver based software (using dietpi-uninstall), before trying again."
+							WHIP_QUESTION="Unable to change your webserver preference to $OPTION.\n\nThis is due to an existing and incompatible webserver installation on your system ($info_currently_installed_webserver). Please remove all webserver based software (using dietpi-software > uninstall), before trying again."
 							whiptail --title "$WHIP_TITLE" --msgbox "$WHIP_QUESTION" --backtitle "$WHIP_BACKTITLE" 11 75
 
 
@@ -11734,10 +13507,11 @@ _EOF_
 
 		fi
 
-		#Webserver stacks, please let DietPi install them for you...
+		#Webserver stacks
 		for ((i=74; i<=82; i++))
 		do
 
+			#Please let DietPi install them for you...
 			if (( ${aSOFTWARE_INSTALL_STATE[$i]} == 1 )); then
 
 				WHIP_TITLE='Info: Webserver Stack'
@@ -11903,8 +13677,8 @@ _EOF_
 		#Weaved
 		if (( ${aSOFTWARE_INSTALL_STATE[68]} == 1 )); then
 
-			WHIP_TITLE=' Weaved - 1st run setup'
-			WHIP_QUESTION='Weaved requires you to create an online account, and, link it this device.\n\nOnce DietPi has completed your software installations, and rebooted, please follow the First Run tutorial here:\nhttp://dietpi.com/phpbb/viewtopic.php?f=8&t=5&p=188#p188'
+			WHIP_TITLE='Remot3.it - 1st run setup'
+			WHIP_QUESTION='Remot3.it requires you to create an online account, and, link it this device.\n\nOnce DietPi has completed your software installations, and rebooted, please follow the First Run tutorial here:\nhttp://dietpi.com/phpbb/viewtopic.php?f=8&t=5&p=188#p188'
 			whiptail --title "$WHIP_TITLE" --msgbox "$WHIP_QUESTION" --backtitle "$WHIP_BACKTITLE" 14 70
 
 		fi
@@ -12319,6 +14093,17 @@ _EOF_
 
 		Banner_Setup
 
+		#Prevent continue if NTPD is not completed: https://github.com/Fourdee/DietPi/issues/786
+		Check_NTPD_Status
+
+		#Insufficient free space
+		/DietPi/dietpi/dietpi-drive_manager 2
+		if (( $? != 0 )); then
+
+			Exit_Destroy
+
+		fi
+
 		#1st run Connection test and DietPi updates
 		#NB: Contains EXIT path
 		if (( $(cat /DietPi/dietpi/.update_stage) == -1 )); then
@@ -12335,13 +14120,7 @@ _EOF_
 			#Activate automation settings from dietpi.txt, if set.
 			FirstRun_Automation_Set
 
-			#1st run Questions for user.
-			FirstRun_Questions
-
 		fi
-
-		#Enable USBDRIVE flag for this system if its mounted/available.
-		Dedicated_Usb_Drive_Enable
 
 		#Start DietPi Menu
 		while (( $TARGETMENUID > -1 )); do
